@@ -19,12 +19,12 @@ class ATRPEnv(gym.Env):
     Length of `var` is `4 * (max chain length) + 2`.
 
     Partition of `var`:
-        mono        = [M]                  = var[0],
-        cu_i        = [CuBr]               = var[1],
-        cu_ii       = [CuBr2]              = var[2],
+        mono    = [M]                  = var[0],
+        cu_i    = [CuBr]               = var[1],
+        cu_ii   = [CuBr2]              = var[2],
         dorm    = [P1Br], ..., [PNBr]  = var[3:3+N],
         rad     = [P1.], ..., [PN.]    = var[3+N:3+2*N],
-        ter_2_n     = [T2], ..., [TN]      = var[3+2*N:2+3*N] (optional).
+        ter     = [T2], ..., [TN]      = var[3+2*N:2+3*N] (optional).
 
     Other arguments (rate constants):
         k_poly: rate constant for (monomer consumption);
