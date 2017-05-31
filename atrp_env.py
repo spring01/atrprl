@@ -6,31 +6,32 @@ from scipy.integrate import odeint
 
 __all__ = ['ATRPEnv']
 
+''' keys in a state '''
 MONO = 'mono'
 CU1 = 'cu1'
 CU2 = 'cu2'
 RAD = 'rad'
 DORM = 'dorm'
-TER = 'ter'
+TER = 'ter' # optional
 
 class ATRPEnv(gym.Env):
 
     '''
-    Length of `var` is `3 * (max chain length) + 2`.
+    Length of `var` is `4 * (max radical chain length) + 2`.
 
     Partition of `var`:
-        mono    = [M]                  = var[0],
-        cu_i    = [CuBr]               = var[1],
-        cu_ii   = [CuBr2]              = var[2],
-        dorm    = [P1Br], ..., [PNBr]  = var[3:3+N],
-        rad     = [P1.], ..., [PN.]    = var[3+N:3+2*N],
-        ter     = [T2], ..., [TN]      = var[3+2*N:2+3*N] (optional).
+        mono    = [M]                   = var[0],
+        cu_i    = [CuBr]                = var[1],
+        cu_ii   = [CuBr2]               = var[2],
+        dorm    = [P1Br], ..., [PnBr]   = var[3:3+n],
+        rad     = [P1.], ..., [Pn.]     = var[3+n:3+2*n],
+        ter     = [T2], ..., [T2n]      = var[3+2*n:2+4*n] (optional).
 
     Other arguments (rate constants):
         k_poly: rate constant for (monomer consumption);
-        k_act: rate constant for (dormant chain --> radical);
+        k_act:  rate constant for (dormant chain --> radical);
         k_dorm: rate constant for (radical --> dormant chain);
-        k_ter: rate constant for (radical --> terminated chain).
+        k_ter:  rate constant for (radical --> terminated chain).
     '''
 
     def __init__(self, timestep=1e1, max_rad_len=100,
@@ -50,7 +51,7 @@ class ATRPEnv(gym.Env):
         self.dorm_init = dorm_init
         self.timestep = np.array([0.0, timestep])
 
-        # variable indices for the ODE solver
+        # variable indices (slices) for the ODE solver
         self.mono_idx = 0
         self.cu1_idx = 1
         self.cu2_idx = 2
@@ -58,8 +59,19 @@ class ATRPEnv(gym.Env):
         self.dorm_slice = slice(dorm_from, dorm_from + max_rad_len)
         rad_from = 3 + max_rad_len
         self.rad_slice = slice(rad_from, rad_from + max_rad_len)
-        ter_from = 3 + 2 * max_rad_len
-        self.ter_slice = slice(ter_from, ter_from + max_rad_len - 1)
+
+        # slices for the 2 types of terminated species
+        # type 1 is of length 2 to n
+        ter1_from = 3 + 2 * max_rad_len
+        self.ter1_slice = slice(ter1_from, ter1_from + max_rad_len - 1)
+
+        # type 2 is of length n+1 to 2n
+        ter2_from = 2 + 3 * max_rad_len
+        self.ter2_slice = slice(ter2_from, ter2_from + max_rad_len)
+
+        # total number of terminated species is 2n-1
+        self.num_ter = 2 * max_rad_len - 1
+        self.ter_slice = slice(ter1_from, ter1_from + self.num_ter)
 
     def _reset(self):
         self.state = {}
@@ -70,7 +82,7 @@ class ATRPEnv(gym.Env):
         self.state[DORM][0] = self.dorm_init
         self.state[RAD] = np.zeros(self.max_rad_len)
         if self.termination:
-            self.state[TER] = np.zeros(self.max_rad_len - 1)
+            self.state[TER] = np.zeros(self.num_ter)
         return self.state
 
     def _step(self, action):
@@ -95,7 +107,7 @@ class ATRPEnv(gym.Env):
         reward = 0.0
         done = False
         info = {}
-        return sol, reward, done, info
+        return self.state, reward, done, info
 
     def _atrp_diff(self, var, time):
         max_rad_len = self.max_rad_len
@@ -138,14 +150,23 @@ class ATRPEnv(gym.Env):
         dvar_rad[1:] += kp_mono_rad[:-1]
         dvar[rad_slice] = dvar_rad
 
-        # terminated chains (of length 2 to n)
+        # terminated chains
         if self.termination:
-            num_ter = max_rad_len - 1
-            dvar_ter = np.zeros(num_ter)
-            for p in range(num_ter):
+            # length 2 to n
+            num_ter1 = max_rad_len - 1
+            dvar_ter1 = np.zeros(num_ter1)
+            for p in range(num_ter1):
                 rad_part = rad[:(p + 1)]
-                dvar_ter[p] = rad_part.dot(rad_part[::-1])
-            dvar[self.ter_slice] = kt2 * dvar_ter
+                dvar_ter1[p] = rad_part.dot(rad_part[::-1])
+            dvar[self.ter1_slice] = kt2 * dvar_ter1
+
+            # length n+1 to 2n
+            num_ter2 = max_rad_len
+            dvar_ter2 = np.zeros(num_ter2)
+            for p in range(num_ter2):
+                rad_part = rad[p:]
+                dvar_ter2[p] = rad_part.dot(rad_part[::-1])
+            dvar[self.ter2_slice] = kt2 * dvar_ter2
 
         return dvar
 
