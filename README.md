@@ -6,6 +6,6 @@ Minimal usage:
 from atrp_env import ATRPEnv
 env = ATRPEnv()
 state = env.reset()
-new_state = env.action(0)
+state_next, reward, done, info = env.step(0)
 ```
 
