@@ -16,7 +16,7 @@ TER = 'ter'
 class ATRPEnv(gym.Env):
 
     '''
-    Length of `var` is `4 * (max chain length) + 2`.
+    Length of `var` is `3 * (max chain length) + 2`.
 
     Partition of `var`:
         mono    = [M]                  = var[0],
