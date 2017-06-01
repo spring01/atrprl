@@ -7,14 +7,6 @@ import matplotlib.pyplot as plt
 
 __all__ = ['ATRPEnv']
 
-''' keys in a state '''
-MONO = 'mono'
-CU1 = 'cu1'
-CU2 = 'cu2'
-RAD = 'rad'
-DORM = 'dorm'
-TER = 'ter' # optional
-
 class ATRPEnv(gym.Env):
 
     '''
@@ -37,22 +29,17 @@ class ATRPEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, timestep=1e1, max_rad_len=100,
+    def __init__(self, timestep=1e1, max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
-                 termination=True,
-                 mono_init=10.0, dorm_init=0.4, cu1_init=0.2, cu2_init=0.22):
-        self.constants = k_poly, k_act, k_dorm, k_ter
+                 mono_init=10.0, cu1_init=0.2, cu2_init=0.22, dorm_init=0.4,
+                 mono_add=0.01, mono_cap=None, cu1_add=0.01, cu1_cap=None,
+                 cu2_add=0.01, cu2_cap=None, dorm1_add=0.01, dorm1_cap=None):
         self.k_poly = k_poly
         self.k_act = k_act
         self.k_dorm = k_dorm
         self.k_ter = k_ter if termination else 0.0
         self.max_rad_len = max_rad_len
         self.termination = termination
-        self.mono_init = mono_init
-        self.cu1_init = cu1_init
-        self.cu2_init = cu2_init
-        self.dorm_init = dorm_init
-        self.timestep = np.array([0.0, timestep])
 
         # variable indices (slices) for the ODE solver
         self.mono_idx = 0
@@ -63,53 +50,41 @@ class ATRPEnv(gym.Env):
         rad_from = 3 + max_rad_len
         self.rad_slice = slice(rad_from, rad_from + max_rad_len)
 
-        # slices for the 2 types of terminated chains (ter)
-        # ter type 1: length 2 to n
-        ter1_from = 3 + 2 * max_rad_len
-        self.ter1_slice = slice(ter1_from, ter1_from + max_rad_len - 1)
+        if termination:
+            # slices for the 2 types of terminated chains (ter)
+            # ter type 1: length 2 to n
+            ter1_from = 3 + 2 * max_rad_len
+            self.ter1_slice = slice(ter1_from, ter1_from + max_rad_len - 1)
 
-        # ter type 2: length n+1 to 2n
-        ter2_from = 2 + 3 * max_rad_len
-        self.ter2_slice = slice(ter2_from, ter2_from + max_rad_len)
+            # ter type 2: length n+1 to 2n
+            ter2_from = 2 + 3 * max_rad_len
+            self.ter2_slice = slice(ter2_from, ter2_from + max_rad_len)
 
-        # total number of terminated chains is 2n-1
-        self.num_ter = 2 * max_rad_len - 1
-        self.ter_slice = slice(ter1_from, ter1_from + self.num_ter)
+            # total number of terminated chains is 2n-1
+            self.ter_slice = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
+
+        # build initial variable and timestep
+        state_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
+        self.var_init = np.zeros(state_len)
+        self.var_init[self.mono_idx] = mono_init
+        self.var_init[self.cu1_idx] = cu1_init
+        self.var_init[self.cu2_idx] = cu2_init
+        self.var_init[self.dorm_slice][0] = dorm_init
+        self.timestep = np.array([0.0, timestep])
 
         # for rendering
         self.axes = None
 
     def _reset(self):
-        self.state = {}
-        self.state[MONO] = self.mono_init
-        self.state[CU1] = self.cu1_init
-        self.state[CU2] = self.cu2_init
-        self.state[DORM] = np.zeros(self.max_rad_len)
-        self.state[DORM][0] = self.dorm_init
-        self.state[RAD] = np.zeros(self.max_rad_len)
-        if self.termination:
-            self.state[TER] = np.zeros(self.num_ter)
+        self.mono_added = 0.0
+        self.cu1_added = 0.0
+        self.cu2_added = 0.0
+        self.dorm1_added = 0.0
+        self.state = self.var_init
         return self.state
 
     def _step(self, action):
-        mono = [self.state[MONO]]
-        cu1 = [self.state[CU1]]
-        cu2 = [self.state[CU2]]
-        dorm = self.state[DORM]
-        rad = self.state[RAD]
-        var = np.concatenate([mono, cu1, cu2, dorm, rad])
-        if self.termination:
-            var = np.concatenate([var, self.state[TER]])
-        sol = odeint(self.atrp_diff, var, self.timestep)[1]
-        self.state = {}
-        self.state[MONO] = sol[self.mono_idx]
-        self.state[CU1] = sol[self.cu1_idx]
-        self.state[CU2] = sol[self.cu2_idx]
-        self.state[DORM] = sol[self.dorm_slice]
-        self.state[RAD] = sol[self.rad_slice]
-        if self.termination:
-            self.state[TER] = sol[self.ter_slice]
-
+        self.state = odeint(self.atrp_diff, self.state, self.timestep)[1]
         reward = 0.0
         done = False
         info = {}
@@ -125,21 +100,18 @@ class ATRPEnv(gym.Env):
         if self.axes is None:
             self.axes = {}
             self.plots = {}
-            rad_space = np.linspace(1, self.max_rad_len, self.max_rad_len)
-            self.generate_plot(DORM, 1, rad_space, 'Dormant chains')
+            self.generate_plot('dorm')
             plt.title('Concentrations')
-            self.generate_plot(RAD, 2, rad_space, 'Radical chains')
+            self.generate_plot('rad')
             if self.termination:
-                ter_space = np.linspace(2, self.num_ter + 1, self.num_ter)
-                self.generate_plot(TER, 3, ter_space, 'Terminated chains')
+                self.generate_plot('ter')
             plt.xlabel('Chain length')
-
             plt.tight_layout()
 
-        self.update_plot(DORM)
-        self.update_plot(RAD)
+        self.update_plot('dorm')
+        self.update_plot('rad')
         if self.termination:
-            self.update_plot(TER)
+            self.update_plot('ter')
         plt.draw()
         plt.pause(0.0001)
 
@@ -204,16 +176,35 @@ class ATRPEnv(gym.Env):
 
         return dvar
 
-    def generate_plot(self, key, num, space, label):
+    def generate_plot(self, key):
+        if key == 'dorm':
+            values = self.state[self.dorm_slice]
+            space = np.linspace(1, len(values), len(values))
+            num = 1
+            label = 'Dormant chains'
+        elif key == 'rad':
+            values = self.state[self.rad_slice]
+            space = np.linspace(1, len(values), len(values))
+            num = 2
+            label = 'Radical chains'
+        elif key == 'ter':
+            values = self.state[self.ter_slice]
+            space = np.linspace(2, len(values) + 1, len(values))
+            num = 3
+            label = 'Terminated chains'
         axis = plt.subplot(3, 1, num)
-        plot = axis.plot(space, self.state[key], label=label)[0]
+        plot = axis.plot(space, values, label=label)[0]
         axis.legend()
         self.axes[key] = axis
         self.plots[key] = plot
 
     def update_plot(self, key):
-        chains = self.state[key]
-        axis = self.axes[key]
-        axis.set_ylim([0, np.max(chains) * 1.1])
-        self.plots[key].set_ydata(chains)
+        if key == 'dorm':
+            values = self.state[self.dorm_slice]
+        elif key == 'rad':
+            values = self.state[self.rad_slice]
+        elif key == 'ter':
+            values = self.state[self.ter_slice]
+        self.axes[key].set_ylim([0, np.max(values) * 1.1])
+        self.plots[key].set_ydata(values)
 
