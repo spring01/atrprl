@@ -2,6 +2,7 @@
 import gym
 import numpy as np
 from scipy.integrate import odeint
+import matplotlib.pyplot as plt
 
 
 __all__ = ['ATRPEnv']
@@ -34,6 +35,8 @@ class ATRPEnv(gym.Env):
         k_ter:  rate constant for (radical --> terminated chain).
     '''
 
+    metadata = {'render.modes': ['human']}
+
     def __init__(self, timestep=1e1, max_rad_len=100,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
                  termination=True,
@@ -60,18 +63,21 @@ class ATRPEnv(gym.Env):
         rad_from = 3 + max_rad_len
         self.rad_slice = slice(rad_from, rad_from + max_rad_len)
 
-        # slices for the 2 types of terminated species
-        # type 1 is of length 2 to n
+        # slices for the 2 types of terminated chains (ter)
+        # ter type 1: length 2 to n
         ter1_from = 3 + 2 * max_rad_len
         self.ter1_slice = slice(ter1_from, ter1_from + max_rad_len - 1)
 
-        # type 2 is of length n+1 to 2n
+        # ter type 2: length n+1 to 2n
         ter2_from = 2 + 3 * max_rad_len
         self.ter2_slice = slice(ter2_from, ter2_from + max_rad_len)
 
-        # total number of terminated species is 2n-1
+        # total number of terminated chains is 2n-1
         self.num_ter = 2 * max_rad_len - 1
         self.ter_slice = slice(ter1_from, ter1_from + self.num_ter)
+
+        # for rendering
+        self.axes = None
 
     def _reset(self):
         self.state = {}
@@ -94,7 +100,7 @@ class ATRPEnv(gym.Env):
         var = np.concatenate([mono, cu1, cu2, dorm, rad])
         if self.termination:
             var = np.concatenate([var, self.state[TER]])
-        sol = odeint(self._atrp_diff, var, self.timestep)[1]
+        sol = odeint(self.atrp_diff, var, self.timestep)[1]
         self.state = {}
         self.state[MONO] = sol[self.mono_idx]
         self.state[CU1] = sol[self.cu1_idx]
@@ -109,7 +115,35 @@ class ATRPEnv(gym.Env):
         info = {}
         return self.state, reward, done, info
 
-    def _atrp_diff(self, var, time):
+    def _render(self, mode='human', close=False):
+        if close:
+            if self.axes is not None:
+                self.axes = None
+                self.plots = None
+                plt.close()
+            return
+        if self.axes is None:
+            self.axes = {}
+            self.plots = {}
+            rad_space = np.linspace(1, self.max_rad_len, self.max_rad_len)
+            self.generate_plot(DORM, 1, rad_space, 'Dormant chains')
+            plt.title('Concentrations')
+            self.generate_plot(RAD, 2, rad_space, 'Radical chains')
+            if self.termination:
+                ter_space = np.linspace(2, self.num_ter + 1, self.num_ter)
+                self.generate_plot(TER, 3, ter_space, 'Terminated chains')
+            plt.xlabel('Chain length')
+
+            plt.tight_layout()
+
+        self.update_plot(DORM)
+        self.update_plot(RAD)
+        if self.termination:
+            self.update_plot(TER)
+        plt.draw()
+        plt.pause(0.0001)
+
+    def atrp_diff(self, var, time):
         max_rad_len = self.max_rad_len
         mono_idx = self.mono_idx
         cu1_idx = self.cu1_idx
@@ -155,7 +189,7 @@ class ATRPEnv(gym.Env):
             # length 2 to n
             num_ter1 = max_rad_len - 1
             dvar_ter1 = np.zeros(num_ter1)
-            for p in range(num_ter1):
+            for p in xrange(num_ter1):
                 rad_part = rad[:(p + 1)]
                 dvar_ter1[p] = rad_part.dot(rad_part[::-1])
             dvar[self.ter1_slice] = kt2 * dvar_ter1
@@ -163,11 +197,23 @@ class ATRPEnv(gym.Env):
             # length n+1 to 2n
             num_ter2 = max_rad_len
             dvar_ter2 = np.zeros(num_ter2)
-            for p in range(num_ter2):
+            for p in xrange(num_ter2):
                 rad_part = rad[p:]
                 dvar_ter2[p] = rad_part.dot(rad_part[::-1])
             dvar[self.ter2_slice] = kt2 * dvar_ter2
 
         return dvar
 
+    def generate_plot(self, key, num, space, label):
+        axis = plt.subplot(3, 1, num)
+        plot = axis.plot(space, self.state[key], label=label)[0]
+        axis.legend()
+        self.axes[key] = axis
+        self.plots[key] = plot
+
+    def update_plot(self, key):
+        chains = self.state[key]
+        axis = self.axes[key]
+        axis.set_ylim([0, np.max(chains) * 1.1])
+        self.plots[key].set_ydata(chains)
 
