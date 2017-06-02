@@ -10,20 +10,20 @@ __all__ = ['ATRPEnv']
 
 ''' rate constants '''
 K_POLY = 0
-K_ACT = 1
+K_ACT  = 1
 K_DORM = 2
-K_TER = 3
+K_TER  = 3
 
 ''' indices and actions '''
 MONOMER = 0
-CU1   = 1
-CU2   = 2
+CU1     = 1
+CU2     = 2
 DORM1   = 3
 
 ''' chains '''
 DORM = 'dorm'
-RAD = 'rad'
-TER = 'ter'
+RAD  = 'rad'
+TER  = 'ter'
 TER1 = 'ter1'
 TER2 = 'ter2'
 
