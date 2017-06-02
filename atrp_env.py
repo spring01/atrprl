@@ -79,10 +79,6 @@ class ATRPEnv(gym.Env):
             self.ter_slice = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
 
         # build initial variable and timestep
-        self.mono_init = mono_init
-        self.cu1_init = cu1_init
-        self.cu2_init = cu2_init
-        self.dorm1_init = dorm1_init
         state_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
         self.observation_space = spaces.Box(0, np.inf, shape=(state_len,))
         self.var_init = np.zeros(state_len)
@@ -109,10 +105,10 @@ class ATRPEnv(gym.Env):
         self.axes = None
 
     def _reset(self):
-        self.mono_added = 0.0
-        self.cu1_added = 0.0
-        self.cu2_added = 0.0
-        self.dorm1_added = 0.0
+        self.mono_added = self.var_init[self.mono_idx]
+        self.cu1_added = self.var_init[self.cu1_idx]
+        self.cu2_added = self.var_init[self.cu2_idx]
+        self.dorm1_added = self.var_init[self.dorm_slice][0]
         self.state = self.var_init
         return self.state
 
@@ -142,11 +138,11 @@ class ATRPEnv(gym.Env):
                 self._generate_plot(TER)
             plt.xlabel('Chain length')
             plt.tight_layout()
-
-        self._update_plot(DORM)
-        self._update_plot(RAD)
-        if self.termination:
-            self._update_plot(TER)
+        else:
+            self._update_plot(DORM)
+            self._update_plot(RAD)
+            if self.termination:
+                self._update_plot(TER)
         plt.draw()
         plt.pause(0.0001)
 
