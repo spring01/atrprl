@@ -8,16 +8,24 @@ import matplotlib.pyplot as plt
 
 __all__ = ['ATRPEnv']
 
-''' actions '''
-ADD_MONOMER = 0
-ADD_CU1   = 1
-ADD_CU2   = 2
-ADD_DORM1   = 3
+''' rate constants '''
+K_POLY = 0
+K_ACT = 1
+K_DORM = 2
+K_TER = 3
+
+''' indices and actions '''
+MONOMER = 0
+CU1   = 1
+CU2   = 2
+DORM1   = 3
 
 ''' chains '''
 DORM = 'dorm'
 RAD = 'rad'
 TER = 'ter'
+TER1 = 'ter1'
+TER2 = 'ter2'
 
 ''' epsilon for float comparison '''
 EPS = 1e-2
@@ -49,66 +57,72 @@ class ATRPEnv(gym.Env):
                  mono_init=10.0, cu1_init=0.2, cu2_init=0.22, dorm1_init=0.4,
                  mono_unit=0.01, mono_cap=None, cu1_unit=0.01, cu1_cap=None,
                  cu2_unit=0.01, cu2_cap=None, dorm1_unit=0.01, dorm1_cap=None):
-        self.k_poly = k_poly
-        self.k_act = k_act
-        self.k_dorm = k_dorm
-        self.k_ter = k_ter if termination else 0.0
+        self.rate_constant = {}
+        self.rate_constant[K_POLY] = k_poly
+        self.rate_constant[K_ACT] = k_act
+        self.rate_constant[K_DORM] = k_dorm
+        self.rate_constant[K_TER] = k_ter if termination else 0.0
         self.max_rad_len = max_rad_len
         self.termination = termination
 
         # variable indices (slices) for the ODE solver
-        self.mono_idx = 0
-        self.cu1_idx = 1
-        self.cu2_idx = 2
+        self.index = {}
+        self.index[MONOMER] = 0
+        self.index[CU1] = 1
+        self.index[CU2] = 2
+        self.index[DORM1] = 3
         dorm_from = 3
-        self.dorm_slice = slice(dorm_from, dorm_from + max_rad_len)
+        self.index[DORM] = slice(dorm_from, dorm_from + max_rad_len)
         rad_from = 3 + max_rad_len
-        self.rad_slice = slice(rad_from, rad_from + max_rad_len)
+        self.index[RAD] = slice(rad_from, rad_from + max_rad_len)
 
         if termination:
             # slices for the 2 types of terminated chains (ter)
             # ter type 1: length 2 to n
             ter1_from = 3 + 2 * max_rad_len
-            self.ter1_slice = slice(ter1_from, ter1_from + max_rad_len - 1)
+            self.index[TER1] = slice(ter1_from, ter1_from + max_rad_len - 1)
 
             # ter type 2: length n+1 to 2n
             ter2_from = 2 + 3 * max_rad_len
-            self.ter2_slice = slice(ter2_from, ter2_from + max_rad_len)
+            self.index[TER2] = slice(ter2_from, ter2_from + max_rad_len)
 
             # total number of terminated chains is 2n-1
-            self.ter_slice = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
+            self.index[TER] = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
 
         # build initial variable and timestep
         state_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
         self.observation_space = spaces.Box(0, np.inf, shape=(state_len,))
         self.var_init = np.zeros(state_len)
-        self.var_init[self.mono_idx] = mono_init
-        self.var_init[self.cu1_idx] = cu1_init
-        self.var_init[self.cu2_idx] = cu2_init
-        self.var_init[self.dorm_slice][0] = dorm1_init
+        self.var_init[self.index[MONOMER]] = mono_init
+        self.var_init[self.index[CU1]] = cu1_init
+        self.var_init[self.index[CU2]] = cu2_init
+        self.var_init[self.index[DORM1]] = dorm1_init
         self.timestep = timestep
         self.ode_time = np.array([0.0, timestep])
 
         # actions
         action_tuple = tuple(spaces.Discrete(2) for _ in xrange(4))
         self.action_space = spaces.Tuple(action_tuple)
-        self.mono_unit = mono_unit
-        self.mono_cap = mono_cap
-        self.cu1_unit = cu1_unit
-        self.cu1_cap = cu1_cap
-        self.cu2_unit = cu2_unit
-        self.cu2_cap = cu2_cap
-        self.dorm1_unit = dorm1_unit
-        self.dorm1_cap = dorm1_cap
+        self.add_unit = {}
+        self.add_unit[MONOMER] = mono_unit
+        self.add_unit[CU1] = cu1_unit
+        self.add_unit[CU2] = cu2_unit
+        self.add_unit[DORM1] = dorm1_unit
+        self.add_cap = {}
+        self.add_cap[MONOMER] = mono_cap
+        self.add_cap[CU1] = cu1_cap
+        self.add_cap[CU2] = cu2_cap
+        self.add_cap[DORM1] = dorm1_cap
 
         # rendering
         self.axes = None
 
     def _reset(self):
-        self.mono_added = self.var_init[self.mono_idx]
-        self.cu1_added = self.var_init[self.cu1_idx]
-        self.cu2_added = self.var_init[self.cu2_idx]
-        self.dorm1_added = self.var_init[self.dorm_slice][0]
+        self.added = {}
+        self.added[MONOMER] = self.var_init[self.index[MONOMER]]
+        self.added[CU1] = self.var_init[self.index[CU1]]
+        self.added[CU2] = self.var_init[self.index[CU2]]
+        self.added[DORM1] = self.var_init[self.index[DORM1]]
         self.state = self.var_init
         return self.state
 
@@ -116,6 +130,14 @@ class ATRPEnv(gym.Env):
         old_state = self.state
         self._take_action(action)
         self.state = odeint(self._atrp_diff, self.state, self.ode_time)[1]
+        #~ max_diff = np.max(np.abs(self.state - old_state))
+        #~ not_changing = max_diff < np.max(np.abs(self.state)) * EPS / self.timestep
+        #~ contains_all = (self.mono_init + self.mono_added) and \
+                #~ (self.cu1_init + self.cu1_added) and \
+                #~ (self.cu2_init + self.cu2_added) and \
+                #~ (self.dorm1_init + self.dorm1_added)
+        #~ print max_diff, np.max(np.abs(self.state)) * EPS / self.timestep
+        #~ done = not_changing and contains_all
         done = False
         reward = 0.0
         info = {}
@@ -147,66 +169,62 @@ class ATRPEnv(gym.Env):
         plt.pause(0.0001)
 
     def _take_action(self, action):
-        if action[ADD_MONOMER]:
-            added_eps = self.mono_added + self.mono_unit * EPS
-            cap = self.mono_cap
+        self._add(action, MONOMER)
+        self._add(action, CU1)
+        self._add(action, CU2)
+        self._add(action, DORM1)
+
+    def _add(self, action, key):
+        if action[key]:
+            unit = self.add_unit[key]
+            added_eps = self.added[key] + unit * EPS
+            cap = self.add_cap[key]
             if cap is None or added_eps < cap:
-                self.state[self.mono_idx] += self.mono_unit
-                self.mono_added += self.mono_unit
-        if action[ADD_CU1]:
-            added_eps = self.cu1_added + self.cu1_unit * EPS
-            cap = self.cu1_cap
-            if cap is None or added_eps < cap:
-                self.state[self.cu1_idx] += self.cu1_unit
-                self.cu1_added += self.cu1_unit
-        if action[ADD_CU2]:
-            added_eps = self.cu2_added + self.cu2_unit * EPS
-            cap = self.cu2_cap
-            if cap is None or added_eps < cap:
-                self.state[self.cu2_idx] += self.cu2_unit
-                self.cu2_added += self.cu2_unit
-        if action[ADD_DORM1]:
-            added_eps = self.dorm1_added + self.dorm1_unit * EPS
-            cap = self.dorm1_cap
-            if cap is None or added_eps < cap:
-                self.state[self.dorm_slice][0] += self.dorm1_unit
-                self.dorm1_added += self.dorm1_unit
+                self.state[self.index[key]] += unit
+                self.added[key] += unit
 
     def _atrp_diff(self, var, time):
         max_rad_len = self.max_rad_len
-        mono_idx = self.mono_idx
-        cu1_idx = self.cu1_idx
-        cu2_idx = self.cu2_idx
-        dorm_slice = self.dorm_slice
-        rad_slice = self.rad_slice
 
-        mono = var[mono_idx]
-        cu1 = var[cu1_idx]
-        cu2 = var[cu2_idx]
+        k_poly = self.rate_constant[K_POLY]
+        k_act = self.rate_constant[K_ACT]
+        k_dorm = self.rate_constant[K_DORM]
+        k_ter = self.rate_constant[K_TER]
+
+
+        mono_index = self.index[MONOMER]
+        cu1_index = self.index[CU1]
+        cu2_index = self.index[CU2]
+        dorm_slice = self.index[DORM]
+        rad_slice = self.index[RAD]
+
+        mono = var[mono_index]
+        cu1 = var[cu1_index]
+        cu2 = var[cu2_index]
         dorm = var[dorm_slice]
         rad = var[rad_slice]
 
         dvar = np.zeros(len(var))
 
-        kt2 = 2 * self.k_ter
-        kp_mono = self.k_poly * mono
+        kt2 = 2 * k_ter
+        kp_mono = k_poly * mono
         kp_mono_rad = kp_mono * rad
         sum_rad = np.sum(rad)
         kp_mono_sum_rad = kp_mono * sum_rad
 
         # monomer
-        dvar[mono_idx] = -kp_mono_sum_rad
+        dvar[mono_index] = -kp_mono_sum_rad
 
         # dormant chains
-        dvar_dorm = (self.k_dorm * cu2) * rad - (self.k_act * cu1) * dorm
+        dvar_dorm = (k_dorm * cu2) * rad - (k_act * cu1) * dorm
         dvar[dorm_slice] = dvar_dorm
 
         # Cu(I)
         sum_dvar_dorm = np.sum(dvar_dorm)
-        dvar[cu1_idx] = sum_dvar_dorm
+        dvar[cu1_index] = sum_dvar_dorm
 
         # Cu(II)
-        dvar[cu2_idx] = -sum_dvar_dorm
+        dvar[cu2_index] = -sum_dvar_dorm
 
         # radicals
         dvar_rad = - dvar_dorm - kp_mono_rad - (kt2 * sum_rad) * rad
@@ -221,7 +239,7 @@ class ATRPEnv(gym.Env):
             for p in xrange(num_ter1):
                 rad_part = rad[:(p + 1)]
                 dvar_ter1[p] = rad_part.dot(rad_part[::-1])
-            dvar[self.ter1_slice] = kt2 * dvar_ter1
+            dvar[self.index[TER1]] = kt2 * dvar_ter1
 
             # length n+1 to 2n
             num_ter2 = max_rad_len
@@ -229,23 +247,21 @@ class ATRPEnv(gym.Env):
             for p in xrange(num_ter2):
                 rad_part = rad[p:]
                 dvar_ter2[p] = rad_part.dot(rad_part[::-1])
-            dvar[self.ter2_slice] = kt2 * dvar_ter2
+            dvar[self.index[TER2]] = kt2 * dvar_ter2
 
         return dvar
 
     def _generate_plot(self, key):
+        values = self.state[self.index[key]]
         if key == DORM:
-            values = self.state[self.dorm_slice]
             space = np.linspace(1, len(values), len(values))
             num = 1
             label = 'Dormant chains'
         elif key == RAD:
-            values = self.state[self.rad_slice]
             space = np.linspace(1, len(values), len(values))
             num = 2
             label = 'Radical chains'
         elif key == TER:
-            values = self.state[self.ter_slice]
             space = np.linspace(2, len(values) + 1, len(values))
             num = 3
             label = 'Terminated chains'
@@ -256,12 +272,7 @@ class ATRPEnv(gym.Env):
         self.plots[key] = plot
 
     def _update_plot(self, key):
-        if key == DORM:
-            values = self.state[self.dorm_slice]
-        elif key == RAD:
-            values = self.state[self.rad_slice]
-        elif key == TER:
-            values = self.state[self.ter_slice]
+        values = self.state[self.index[key]]
         self.axes[key].set_ylim([0, np.max(values) * 1.1])
         self.plots[key].set_ydata(values)
 
