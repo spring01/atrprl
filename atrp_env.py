@@ -15,7 +15,7 @@ K_DORM = 2
 K_TER  = 3
 
 ''' indices and actions '''
-MONOMER = 0
+MONO = 0
 CU1     = 1
 CU2     = 2
 DORM1   = 3
@@ -67,7 +67,7 @@ class ATRPEnv(gym.Env):
 
         # variable indices (slices) for the ODE solver
         self.index = {}
-        self.index[MONOMER] = 0
+        self.index[MONO] = 0
         self.index[CU1] = 1
         self.index[CU2] = 2
         self.index[DORM1] = 3
@@ -93,7 +93,7 @@ class ATRPEnv(gym.Env):
         state_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
         self.observation_space = spaces.Box(0, np.inf, shape=(state_len,))
         self.var_init = np.zeros(state_len)
-        self.var_init[self.index[MONOMER]] = mono_init
+        self.var_init[self.index[MONO]] = mono_init
         self.var_init[self.index[CU1]] = cu1_init
         self.var_init[self.index[CU2]] = cu2_init
         self.var_init[self.index[DORM1]] = dorm1_init
@@ -104,12 +104,12 @@ class ATRPEnv(gym.Env):
         action_tuple = tuple(spaces.Discrete(2) for _ in xrange(4))
         self.action_space = spaces.Tuple(action_tuple)
         self.add_unit = {}
-        self.add_unit[MONOMER] = mono_unit
+        self.add_unit[MONO] = mono_unit
         self.add_unit[CU1] = cu1_unit
         self.add_unit[CU2] = cu2_unit
         self.add_unit[DORM1] = dorm1_unit
         self.add_cap = {}
-        self.add_cap[MONOMER] = mono_cap
+        self.add_cap[MONO] = mono_cap
         self.add_cap[CU1] = cu1_cap
         self.add_cap[CU2] = cu2_cap
         self.add_cap[DORM1] = dorm1_cap
@@ -119,7 +119,7 @@ class ATRPEnv(gym.Env):
 
     def _reset(self):
         self.added = {}
-        self.added[MONOMER] = self.var_init[self.index[MONOMER]]
+        self.added[MONO] = self.var_init[self.index[MONO]]
         self.added[CU1] = self.var_init[self.index[CU1]]
         self.added[CU2] = self.var_init[self.index[CU2]]
         self.added[DORM1] = self.var_init[self.index[DORM1]]
@@ -127,18 +127,10 @@ class ATRPEnv(gym.Env):
         return self.state
 
     def _step(self, action):
-        old_state = self.state
+        old_state = self.state.copy()
         self._take_action(action)
         self.state = odeint(self._atrp_diff, self.state, self.ode_time)[1]
-        #~ max_diff = np.max(np.abs(self.state - old_state))
-        #~ not_changing = max_diff < np.max(np.abs(self.state)) * EPS / self.timestep
-        #~ contains_all = (self.mono_init + self.mono_added) and \
-                #~ (self.cu1_init + self.cu1_added) and \
-                #~ (self.cu2_init + self.cu2_added) and \
-                #~ (self.dorm1_init + self.dorm1_added)
-        #~ print max_diff, np.max(np.abs(self.state)) * EPS / self.timestep
-        #~ done = not_changing and contains_all
-        done = False
+        done = self._done(old_state)
         reward = 0.0
         info = {}
         return self.state, reward, done, info
@@ -169,19 +161,27 @@ class ATRPEnv(gym.Env):
         plt.pause(0.0001)
 
     def _take_action(self, action):
-        self._add(action, MONOMER)
+        self._add(action, MONO)
         self._add(action, CU1)
         self._add(action, CU2)
         self._add(action, DORM1)
 
     def _add(self, action, key):
-        if action[key]:
+        if action[key] and self._uncapped(key):
             unit = self.add_unit[key]
-            added_eps = self.added[key] + unit * EPS
-            cap = self.add_cap[key]
-            if cap is None or added_eps < cap:
-                self.state[self.index[key]] += unit
-                self.added[key] += unit
+            self.state[self.index[key]] += unit
+            self.added[key] += unit
+
+    def _done(self, old_state):
+        max_diff = np.max(np.abs(self.state - old_state))
+        threshold = np.max(np.abs(self.state)) * EPS / self.timestep
+        return max_diff < threshold and not self._uncapped(MONO)
+
+    def _uncapped(self, key):
+        unit = self.add_unit[key]
+        added_eps = self.added[key] + unit * EPS
+        cap = self.add_cap[key]
+        return cap is None or added_eps < cap
 
     def _atrp_diff(self, var, time):
         max_rad_len = self.max_rad_len
@@ -192,7 +192,7 @@ class ATRPEnv(gym.Env):
         k_ter = self.rate_constant[K_TER]
 
 
-        mono_index = self.index[MONOMER]
+        mono_index = self.index[MONO]
         cu1_index = self.index[CU1]
         cu2_index = self.index[CU2]
         dorm_slice = self.index[DORM]
