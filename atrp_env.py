@@ -15,17 +15,17 @@ K_DORM = 2
 K_TER  = 3
 
 ''' indices and actions '''
-MONO = 0
-CU1     = 1
-CU2     = 2
-DORM1   = 3
+MONO  = 0
+CU1   = 1
+CU2   = 2
+DORM1 = 3
 
 ''' chains '''
 DORM = 'dorm'
 RAD  = 'rad'
 TER  = 'ter'
-TER1 = 'ter1'
-TER2 = 'ter2'
+TER_A = 'ter_a'
+TER_B = 'ter_b'
 
 ''' epsilon for float comparison '''
 EPS = 1e-2
@@ -80,11 +80,11 @@ class ATRPEnv(gym.Env):
             # slices for the 2 types of terminated chains (ter)
             # ter type 1: length 2 to n
             ter1_from = 3 + 2 * max_rad_len
-            self.index[TER1] = slice(ter1_from, ter1_from + max_rad_len - 1)
+            self.index[TER_A] = slice(ter1_from, ter1_from + max_rad_len - 1)
 
             # ter type 2: length n+1 to 2n
             ter2_from = 2 + 3 * max_rad_len
-            self.index[TER2] = slice(ter2_from, ter2_from + max_rad_len)
+            self.index[TER_B] = slice(ter2_from, ter2_from + max_rad_len)
 
             # total number of terminated chains is 2n-1
             self.index[TER] = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
@@ -191,7 +191,6 @@ class ATRPEnv(gym.Env):
         k_dorm = self.rate_constant[K_DORM]
         k_ter = self.rate_constant[K_TER]
 
-
         mono_index = self.index[MONO]
         cu1_index = self.index[CU1]
         cu2_index = self.index[CU2]
@@ -239,7 +238,7 @@ class ATRPEnv(gym.Env):
             for p in xrange(num_ter1):
                 rad_part = rad[:(p + 1)]
                 dvar_ter1[p] = rad_part.dot(rad_part[::-1])
-            dvar[self.index[TER1]] = kt2 * dvar_ter1
+            dvar[self.index[TER_A]] = kt2 * dvar_ter1
 
             # length n+1 to 2n
             num_ter2 = max_rad_len
@@ -247,7 +246,7 @@ class ATRPEnv(gym.Env):
             for p in xrange(num_ter2):
                 rad_part = rad[p:]
                 dvar_ter2[p] = rad_part.dot(rad_part[::-1])
-            dvar[self.index[TER2]] = kt2 * dvar_ter2
+            dvar[self.index[TER_B]] = kt2 * dvar_ter2
 
         return dvar
 
