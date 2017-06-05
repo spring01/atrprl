@@ -20,7 +20,7 @@ CU1   = 1
 CU2   = 2
 DORM1 = 3
 
-''' chains '''
+''' chain types '''
 DORM = 'dorm'
 RAD  = 'rad'
 TER  = 'ter'
@@ -56,7 +56,9 @@ class ATRPEnv(gym.Env):
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
                  mono_init=10.0, cu1_init=0.2, cu2_init=0.22, dorm1_init=0.4,
                  mono_unit=0.01, mono_cap=None, cu1_unit=0.01, cu1_cap=None,
-                 cu2_unit=0.01, cu2_cap=None, dorm1_unit=0.01, dorm1_cap=None):
+                 cu2_unit=0.01, cu2_cap=None, dorm1_unit=0.01, dorm1_cap=None,
+                 reward_type='chain length',
+                 reward_chain_type='dorm', reward_range=(20, 30), reward_unit=0.01):
         self.rate_constant = {}
         self.rate_constant[K_POLY] = k_poly
         self.rate_constant[K_ACT] = k_act
@@ -114,6 +116,17 @@ class ATRPEnv(gym.Env):
         self.add_cap[CU2] = cu2_cap
         self.add_cap[DORM1] = dorm1_cap
 
+        # rewards
+        self.reward_type = reward_type.lower()
+        self.reward_chain_type = reward_chain_type.lower()
+        self.reward_unit = reward_unit
+        if self.reward_chain_type == 'dorm':
+            start = 1
+        elif self.reward_chain_type == 'ter':
+            start = 2
+        self.reward_slice = slice(*(r - start for r in reward_range))
+        self.reward_chain_mono = np.arange(*reward_range)
+
         # rendering
         self.axes = None
 
@@ -124,6 +137,8 @@ class ATRPEnv(gym.Env):
         self.added[CU2] = self.var_init[self.index[CU2]]
         self.added[DORM1] = self.var_init[self.index[DORM1]]
         self.state = self.var_init
+        chain = self.state[self.index[self.reward_chain_type]]
+        self.last_reward_chain = chain[self.reward_slice]
         return self.state
 
     def _step(self, action):
@@ -131,7 +146,8 @@ class ATRPEnv(gym.Env):
         self._take_action(action)
         self.state = odeint(self._atrp_diff, self.state, self.ode_time)[1]
         done = self._done(old_state)
-        reward = 0.0
+        if self.reward_type == 'chain length':
+            reward = self._reward_chain_length()
         info = {}
         return self.state, reward, done, info
 
@@ -176,6 +192,17 @@ class ATRPEnv(gym.Env):
         max_diff = np.max(np.abs(self.state - old_state))
         threshold = np.max(np.abs(self.state)) * EPS / self.timestep
         return max_diff < threshold and not self._uncapped(MONO)
+
+    def _reward_chain_length(self):
+        chain = self.state[self.index[self.reward_chain_type]]
+        reward_chain = chain[self.reward_slice]
+        diff_reward_chain = reward_chain - self.last_reward_chain
+        diff_reward_chain_mono = diff_reward_chain * self.reward_chain_mono
+        pos_reward = np.sum(diff_reward_chain_mono > self.reward_unit)
+        neg_reward = np.sum(diff_reward_chain_mono < -self.reward_unit)
+        if pos_reward or neg_reward:
+            self.last_reward_chain = reward_chain
+        return pos_reward - neg_reward
 
     def _uncapped(self, key):
         unit = self.add_unit[key]
