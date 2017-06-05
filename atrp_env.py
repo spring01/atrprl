@@ -19,6 +19,7 @@ MONO  = 0
 CU1   = 1
 CU2   = 2
 DORM1 = 3
+SOL   = 4
 
 ''' chain types '''
 DORM = 'dorm'
@@ -54,9 +55,11 @@ class ATRPEnv(gym.Env):
 
     def __init__(self, timestep=1e1, max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
-                 mono_init=10.0, cu1_init=0.2, cu2_init=0.2, dorm1_init=0.4,
-                 mono_unit=0.01, mono_cap=None, cu1_unit=0.01, cu1_cap=None,
-                 cu2_unit=0.01, cu2_cap=None, dorm1_unit=0.01, dorm1_cap=None,
+                 mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
+                 cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
+                 cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
+                 dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
+                 sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=None,
                  reward_type='chain length',
                  reward_chain_type='dorm', reward_range=(20, 30), reward_unit=0.01):
         self.rate_constant = {}
@@ -94,27 +97,35 @@ class ATRPEnv(gym.Env):
         # build initial variable and timestep
         state_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
         self.observation_space = spaces.Box(0, np.inf, shape=(state_len,))
+        self.init_amount = {MONO: mono_init, CU1: cu1_init, CU2: cu2_init,
+                            DORM1: dorm1_init, SOL: sol_init}
+        self.density = {MONO: mono_density, SOL: sol_density}
+        self.volume = volume = mono_init / mono_density + sol_init / sol_density
         self.var_init = np.zeros(state_len)
-        self.var_init[self.index[MONO]] = mono_init
-        self.var_init[self.index[CU1]] = cu1_init
-        self.var_init[self.index[CU2]] = cu2_init
-        self.var_init[self.index[DORM1]] = dorm1_init
+        self.var_init[self.index[MONO]] = mono_init / volume
+        self.var_init[self.index[CU1]] = cu1_init / volume
+        self.var_init[self.index[CU2]] = cu2_init / volume
+        self.var_init[self.index[DORM1]] = dorm1_init / volume
         self.timestep = timestep
         self.ode_time = np.array([0.0, timestep])
 
         # actions
-        action_tuple = tuple(spaces.Discrete(2) for _ in xrange(4))
+        action_tuple = tuple(spaces.Discrete(2) for _ in xrange(5))
         self.action_space = spaces.Tuple(action_tuple)
         self.add_unit = {}
         self.add_unit[MONO] = mono_unit
         self.add_unit[CU1] = cu1_unit
         self.add_unit[CU2] = cu2_unit
         self.add_unit[DORM1] = dorm1_unit
+        self.add_unit[SOL] = sol_unit
         self.add_cap = {}
         self.add_cap[MONO] = mono_cap
         self.add_cap[CU1] = cu1_cap
         self.add_cap[CU2] = cu2_cap
         self.add_cap[DORM1] = dorm1_cap
+        self.add_cap[SOL] = sol_cap
+        self.volume_unit = {MONO: mono_unit / mono_density,
+                            SOL: sol_unit / sol_density}
 
         # rewards
         self.reward_type = reward_type.lower()
@@ -131,12 +142,9 @@ class ATRPEnv(gym.Env):
         self.axes = None
 
     def _reset(self):
-        self.added = {}
-        self.added[MONO] = self.var_init[self.index[MONO]]
-        self.added[CU1] = self.var_init[self.index[CU1]]
-        self.added[CU2] = self.var_init[self.index[CU2]]
-        self.added[DORM1] = self.var_init[self.index[DORM1]]
-        self.state = self.var_init
+        self.added = self.init_amount.copy()
+        self.state = self.var_init.copy()
+        # todo: reward becomes wrong after considering volume
         chain = self.state[self.index[self.reward_chain_type]]
         self.last_reward_chain = chain[self.reward_slice]
         return self.state
@@ -177,16 +185,27 @@ class ATRPEnv(gym.Env):
         plt.pause(0.0001)
 
     def _take_action(self, action):
-        self._add(action, MONO)
-        self._add(action, CU1)
-        self._add(action, CU2)
-        self._add(action, DORM1)
+        quantity = self.state * self.volume
+        quantity = self._add(quantity, action, MONO, change_volume=True)
+        quantity = self._add(quantity, action, CU1)
+        quantity = self._add(quantity, action, CU2)
+        quantity = self._add(quantity, action, DORM1)
+        self._add_sol(action)
+        self.state = quantity / self.volume
 
-    def _add(self, action, key):
+    def _add(self, quantity, action, key, change_volume=False):
         if action[key] and self._uncapped(key):
             unit = self.add_unit[key]
-            self.state[self.index[key]] += unit
+            quantity[self.index[key]] += unit
+            if change_volume:
+                self.volume += self.volume_unit[key]
             self.added[key] += unit
+        return quantity
+
+    def _add_sol(self, action):
+        if action[SOL] and self._uncapped(SOL):
+            self.volume += self.volume_unit[SOL]
+            self.added[SOL] += self.add_unit[SOL]
 
     def _done(self, old_state):
         max_diff = np.max(np.abs(self.state - old_state))
@@ -279,16 +298,17 @@ class ATRPEnv(gym.Env):
 
     def _generate_plot(self, key):
         values = self.state[self.index[key]]
+        len_values = len(values)
         if key == DORM:
-            space = np.linspace(1, len(values), len(values))
+            space = np.linspace(1, len_values, len_values)
             num = 1
             label = 'Dormant chains'
         elif key == RAD:
-            space = np.linspace(1, len(values), len(values))
+            space = np.linspace(1, len_values, len_values)
             num = 2
             label = 'Radical chains'
         elif key == TER:
-            space = np.linspace(2, len(values) + 1, len(values))
+            space = np.linspace(2, len_values + 1, len_values)
             num = 3
             label = 'Terminated chains'
         axis = plt.subplot(3, 1, num)
