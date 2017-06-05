@@ -54,7 +54,7 @@ class ATRPEnv(gym.Env):
 
     def __init__(self, timestep=1e1, max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
-                 mono_init=10.0, cu1_init=0.2, cu2_init=0.22, dorm1_init=0.4,
+                 mono_init=10.0, cu1_init=0.2, cu2_init=0.2, dorm1_init=0.4,
                  mono_unit=0.01, mono_cap=None, cu1_unit=0.01, cu1_cap=None,
                  cu2_unit=0.01, cu2_cap=None, dorm1_unit=0.01, dorm1_cap=None,
                  reward_type='chain length',
