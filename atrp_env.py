@@ -34,21 +34,38 @@ EPS = 1e-2
 class ATRPEnv(gym.Env):
 
     '''
-    Length of `var` is `4 * (max radical chain length) + 2`.
+    Length of `quant` is `4 * (max radical chain length) + 2`.
 
-    Partition of `var`:
-        mono    = [M]                   = var[0],
-        cu_i    = [CuBr]                = var[1],
-        cu_ii   = [CuBr2]               = var[2],
-        dorm    = [P1Br], ..., [PnBr]   = var[3:3+n],
-        rad     = [P1.], ..., [Pn.]     = var[3+n:3+2*n],
-        ter     = [T2], ..., [T2n]      = var[3+2*n:2+4*n] (optional).
+    Partition of `quant`:
+        mono  = [M]                 = quant[0],
+        cu_i  = [CuBr]              = quant[1],
+        cu_ii = [CuBr2]             = quant[2],
+        dorm  = [P1Br], ..., [PnBr] = quant[3:3+n],
+        rad   = [P1.], ..., [Pn.]   = quant[3+n:3+2*n],
+        ter   = [T2], ..., [T2n]    = quant[3+2*n:2+4*n] (optional).
 
-    Other arguments (rate constants):
+    Rate constants:
         k_poly: rate constant for (monomer consumption);
         k_act:  rate constant for (dormant chain --> radical);
         k_dorm: rate constant for (radical --> dormant chain);
         k_ter:  rate constant for (radical --> terminated chain).
+
+    Action related:
+        mono_init:    initial quantity of monomer;
+        mono_density: density of monomer (useful in calculating the volume);
+        mono_unit:    unit amount of the "adding monomer" action;
+        mono_cap:     maximum quantity (budget) of monomer.
+        (Other X_init, X_unit, X_cap variables have similar definitions.)
+
+    Reward related:
+        reward_mode: 'chain length' (cl) or 'distribution' (dn, not implemented yet).
+    'chain length' mode:
+        cl_chain: desired chain type, 'dorm' or 'ter';
+        cl_range: range of desired chain lengths
+                  (left inclusive, right exclusive);
+        cl_unit:  unit of change in equivalent amount of monomer
+                  considered as rewarding.
+
     '''
 
     metadata = {'render.modes': ['human']}
