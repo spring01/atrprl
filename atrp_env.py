@@ -120,7 +120,10 @@ class ATRPEnv(gym.Env):
         self.reward_mode = reward_mode.lower()
         self.cl_chain = cl_chain.lower()
         self.cl_unit = cl_unit
-        start = {'dorm': 1, 'ter': 2}[self.cl_chain]
+        if self.cl_chain == 'dorm':
+            start = 1
+        elif self.cl_chain == 'ter':
+            start = 2
         self.cl_slice = slice(*(r - start for r in cl_range))
         self.cl_num_mono = np.arange(*cl_range)
 
