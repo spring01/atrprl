@@ -60,39 +60,34 @@ class ATRPEnv(gym.Env):
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=None,
-                 reward_type='chain length',
-                 reward_chain_type='dorm', reward_range=(20, 30), reward_unit=0.01):
-        self.rate_constant = {}
-        self.rate_constant[K_POLY] = k_poly
-        self.rate_constant[K_ACT] = k_act
-        self.rate_constant[K_DORM] = k_dorm
-        self.rate_constant[K_TER] = k_ter if termination else 0.0
+                 reward_mode='chain length',
+                 cl_chain='dorm', cl_range=(20, 30), cl_unit=0.01):
+        rate_constant = {K_POLY: k_poly, K_ACT: k_act, K_DORM: k_dorm}
+        rate_constant[K_TER] = k_ter if termination else 0.0
+        self.rate_constant = rate_constant
         self.max_rad_len = max_rad_len
         self.termination = termination
 
         # variable indices (slices) for the ODE solver
-        self.index = {}
-        self.index[MONO] = 0
-        self.index[CU1] = 1
-        self.index[CU2] = 2
-        self.index[DORM1] = 3
+        index = {MONO: 0, CU1: 1, CU2: 2, DORM1: 3}
         dorm_from = 3
-        self.index[DORM] = slice(dorm_from, dorm_from + max_rad_len)
+        index[DORM] = slice(dorm_from, dorm_from + max_rad_len)
         rad_from = 3 + max_rad_len
-        self.index[RAD] = slice(rad_from, rad_from + max_rad_len)
+        index[RAD] = slice(rad_from, rad_from + max_rad_len)
 
         if termination:
             # slices for the 2 types of terminated chains (ter)
             # ter type 1: length 2 to n
             ter1_from = 3 + 2 * max_rad_len
-            self.index[TER_A] = slice(ter1_from, ter1_from + max_rad_len - 1)
+            index[TER_A] = slice(ter1_from, ter1_from + max_rad_len - 1)
 
             # ter type 2: length n+1 to 2n
             ter2_from = 2 + 3 * max_rad_len
-            self.index[TER_B] = slice(ter2_from, ter2_from + max_rad_len)
+            index[TER_B] = slice(ter2_from, ter2_from + max_rad_len)
 
             # total number of terminated chains is 2n-1
-            self.index[TER] = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
+            index[TER] = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
+        self.index = index
 
         # build initial variable and timestep
         state_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
@@ -101,63 +96,56 @@ class ATRPEnv(gym.Env):
                             DORM1: dorm1_init, SOL: sol_init}
         self.density = {MONO: mono_density, SOL: sol_density}
         self.volume = volume = mono_init / mono_density + sol_init / sol_density
-        self.var_init = np.zeros(state_len)
-        self.var_init[self.index[MONO]] = mono_init / volume
-        self.var_init[self.index[CU1]] = cu1_init / volume
-        self.var_init[self.index[CU2]] = cu2_init / volume
-        self.var_init[self.index[DORM1]] = dorm1_init / volume
+
+        quant_init = np.zeros(state_len)
+        quant_init[self.index[MONO]] = mono_init
+        quant_init[self.index[CU1]] = cu1_init
+        quant_init[self.index[CU2]] = cu2_init
+        quant_init[self.index[DORM1]] = dorm1_init
+        self.quant_init = quant_init
         self.timestep = timestep
         self.ode_time = np.array([0.0, timestep])
 
         # actions
         action_tuple = tuple(spaces.Discrete(2) for _ in xrange(5))
         self.action_space = spaces.Tuple(action_tuple)
-        self.add_unit = {}
-        self.add_unit[MONO] = mono_unit
-        self.add_unit[CU1] = cu1_unit
-        self.add_unit[CU2] = cu2_unit
-        self.add_unit[DORM1] = dorm1_unit
-        self.add_unit[SOL] = sol_unit
-        self.add_cap = {}
-        self.add_cap[MONO] = mono_cap
-        self.add_cap[CU1] = cu1_cap
-        self.add_cap[CU2] = cu2_cap
-        self.add_cap[DORM1] = dorm1_cap
-        self.add_cap[SOL] = sol_cap
+        self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
+                         DORM1: dorm1_unit, SOL: sol_unit}
+        self.add_cap = {MONO: mono_cap, CU1: cu1_cap, CU2: cu2_cap,
+                        DORM1: dorm1_cap, SOL: sol_cap}
         self.volume_unit = {MONO: mono_unit / mono_density,
                             SOL: sol_unit / sol_density}
 
         # rewards
-        self.reward_type = reward_type.lower()
-        self.reward_chain_type = reward_chain_type.lower()
-        self.reward_unit = reward_unit
-        if self.reward_chain_type == 'dorm':
-            start = 1
-        elif self.reward_chain_type == 'ter':
-            start = 2
-        self.reward_slice = slice(*(r - start for r in reward_range))
-        self.reward_chain_mono = np.arange(*reward_range)
+        self.reward_mode = reward_mode.lower()
+        self.cl_chain = cl_chain.lower()
+        self.cl_unit = cl_unit
+        start = {'dorm': 1, 'ter': 2}[self.cl_chain]
+        self.cl_slice = slice(*(r - start for r in cl_range))
+        self.cl_num_mono = np.arange(*cl_range)
 
         # rendering
         self.axes = None
 
     def _reset(self):
         self.added = self.init_amount.copy()
-        self.state = self.var_init.copy()
-        # todo: reward becomes wrong after considering volume
-        chain = self.state[self.index[self.reward_chain_type]]
-        self.last_reward_chain = chain[self.reward_slice]
-        return self.state
+        self.quant = self.quant_init
+        if self.reward_mode == 'chain length':
+            chain = self.quant[self.index[self.cl_chain]]
+            self.last_reward_chain = chain[self.cl_slice]
+        return self.quant / self.volume
 
     def _step(self, action):
-        old_state = self.state.copy()
+        old_quant = self.quant.copy()
         self._take_action(action)
-        self.state = odeint(self._atrp_diff, self.state, self.ode_time)[1]
-        done = self._done(old_state)
-        if self.reward_type == 'chain length':
+        conc = self.quant / self.volume
+        conc = odeint(self._atrp_diff, conc, self.ode_time)[1]
+        self.quant = conc * self.volume
+        done = self._done(old_quant)
+        if self.reward_mode == 'chain length':
             reward = self._reward_chain_length()
         info = {}
-        return self.state, reward, done, info
+        return self.quant, reward, done, info
 
     def _render(self, mode='human', close=False):
         if close:
@@ -170,7 +158,7 @@ class ATRPEnv(gym.Env):
             self.axes = {}
             self.plots = {}
             self._generate_plot(DORM)
-            plt.title('Concentrations')
+            plt.title('Quantities')
             self._generate_plot(RAD)
             if self.termination:
                 self._generate_plot(TER)
@@ -185,40 +173,38 @@ class ATRPEnv(gym.Env):
         plt.pause(0.0001)
 
     def _take_action(self, action):
-        quantity = self.state * self.volume
-        quantity = self._add(quantity, action, MONO, change_volume=True)
-        quantity = self._add(quantity, action, CU1)
-        quantity = self._add(quantity, action, CU2)
-        quantity = self._add(quantity, action, DORM1)
+        self._add(action, MONO, change_volume=True)
+        self._add(action, CU1)
+        self._add(action, CU2)
+        self._add(action, DORM1)
         self._add_sol(action)
-        self.state = quantity / self.volume
 
-    def _add(self, quantity, action, key, change_volume=False):
+    def _add(self, action, key, change_volume=False):
         if action[key] and self._uncapped(key):
             unit = self.add_unit[key]
-            quantity[self.index[key]] += unit
+            self.quant[self.index[key]] += unit
             if change_volume:
                 self.volume += self.volume_unit[key]
             self.added[key] += unit
-        return quantity
 
     def _add_sol(self, action):
         if action[SOL] and self._uncapped(SOL):
             self.volume += self.volume_unit[SOL]
             self.added[SOL] += self.add_unit[SOL]
 
-    def _done(self, old_state):
-        max_diff = np.max(np.abs(self.state - old_state))
-        threshold = np.max(np.abs(self.state)) * EPS / self.timestep
-        return max_diff < threshold and not self._uncapped(MONO)
+    def _done(self, old_quant):
+        max_diff = np.max(np.abs(self.quant - old_quant))
+        threshold = np.max(np.abs(self.quant)) * EPS / self.timestep
+        capped = not self._uncapped(MONO) and not self._uncapped(SOL)
+        return max_diff < threshold and capped
 
     def _reward_chain_length(self):
-        chain = self.state[self.index[self.reward_chain_type]]
-        reward_chain = chain[self.reward_slice]
+        chain = self.quant[self.index[self.cl_chain]]
+        reward_chain = chain[self.cl_slice]
         diff_reward_chain = reward_chain - self.last_reward_chain
-        diff_reward_chain_mono = diff_reward_chain * self.reward_chain_mono
-        pos_reward = np.sum(diff_reward_chain_mono > self.reward_unit)
-        neg_reward = np.sum(diff_reward_chain_mono < -self.reward_unit)
+        diff_cl_num_mono = diff_reward_chain * self.cl_num_mono
+        pos_reward = np.sum(diff_cl_num_mono > self.cl_unit)
+        neg_reward = np.sum(diff_cl_num_mono < -self.cl_unit)
         if pos_reward or neg_reward:
             self.last_reward_chain = reward_chain
         return pos_reward - neg_reward
@@ -297,7 +283,7 @@ class ATRPEnv(gym.Env):
         return dvar
 
     def _generate_plot(self, key):
-        values = self.state[self.index[key]]
+        values = self.quant[self.index[key]]
         len_values = len(values)
         if key == DORM:
             space = np.linspace(1, len_values, len_values)
@@ -318,7 +304,7 @@ class ATRPEnv(gym.Env):
         self.plots[key] = plot
 
     def _update_plot(self, key):
-        values = self.state[self.index[key]]
+        values = self.quant[self.index[key]]
         self.axes[key].set_ylim([0, np.max(values) * 1.1])
         self.plots[key].set_ydata(values)
 
