@@ -98,10 +98,10 @@ class ATRPEnv(gym.Env):
         self.volume = volume = mono_init / mono_density + sol_init / sol_density
 
         quant_init = np.zeros(state_len)
-        quant_init[self.index[MONO]] = mono_init
-        quant_init[self.index[CU1]] = cu1_init
-        quant_init[self.index[CU2]] = cu2_init
-        quant_init[self.index[DORM1]] = dorm1_init
+        quant_init[index[MONO]] = mono_init
+        quant_init[index[CU1]] = cu1_init
+        quant_init[index[CU2]] = cu2_init
+        quant_init[index[DORM1]] = dorm1_init
         self.quant_init = quant_init
         self.timestep = timestep
         self.ode_time = np.array([0.0, timestep])
@@ -221,16 +221,18 @@ class ATRPEnv(gym.Env):
     def _atrp_diff(self, var, time):
         max_rad_len = self.max_rad_len
 
-        k_poly = self.rate_constant[K_POLY]
-        k_act = self.rate_constant[K_ACT]
-        k_dorm = self.rate_constant[K_DORM]
-        k_ter = self.rate_constant[K_TER]
+        rate_constant = self.rate_constant
+        k_poly = rate_constant[K_POLY]
+        k_act = rate_constant[K_ACT]
+        k_dorm = rate_constant[K_DORM]
+        k_ter = rate_constant[K_TER]
 
-        mono_index = self.index[MONO]
-        cu1_index = self.index[CU1]
-        cu2_index = self.index[CU2]
-        dorm_slice = self.index[DORM]
-        rad_slice = self.index[RAD]
+        index = self.index
+        mono_index = index[MONO]
+        cu1_index = index[CU1]
+        cu2_index = index[CU2]
+        dorm_slice = index[DORM]
+        rad_slice = index[RAD]
 
         mono = var[mono_index]
         cu1 = var[cu1_index]
@@ -273,7 +275,7 @@ class ATRPEnv(gym.Env):
             for p in xrange(num_ter1):
                 rad_part = rad[:(p + 1)]
                 dvar_ter1[p] = rad_part.dot(rad_part[::-1])
-            dvar[self.index[TER_A]] = kt2 * dvar_ter1
+            dvar[index[TER_A]] = kt2 * dvar_ter1
 
             # length n+1 to 2n
             num_ter2 = max_rad_len
@@ -281,7 +283,7 @@ class ATRPEnv(gym.Env):
             for p in xrange(num_ter2):
                 rad_part = rad[p:]
                 dvar_ter2[p] = rad_part.dot(rad_part[::-1])
-            dvar[self.index[TER_B]] = kt2 * dvar_ter2
+            dvar[index[TER_B]] = kt2 * dvar_ter2
 
         return dvar
 
