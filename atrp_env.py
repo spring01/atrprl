@@ -78,7 +78,7 @@ class ATRPEnv(gym.Env):
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
-                 sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=None,
+                 sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=0.0,
                  reward_mode='chain length', reward_chain_type='dorm',
                  cl_range=(20, 30), cl_unit=0.01,
                  dn_dist=None):
@@ -154,6 +154,10 @@ class ATRPEnv(gym.Env):
                 chain_slice = index[reward_chain_type]
                 dn_dist = np.ones(chain_slice.stop - chain_slice.start)
                 dn_dist /= np.sum(dn_dist)
+            dn_dist = dn_dist.copy()
+            dn_dist_eps = min(1e-16, np.min(dn_dist[dn_dist > 0]))
+            self.dn_dist_eps = dn_dist[dn_dist == 0] = dn_dist_eps
+            dn_dist /= np.sum(dn_dist)
             self.dn_dist = dn_dist
 
         # rendering
@@ -176,6 +180,8 @@ class ATRPEnv(gym.Env):
         done = self._done(old_quant)
         if self.reward_mode == 'chain length':
             reward = self._reward_chain_length()
+        elif self.reward_mode == 'distribution':
+            reward = self._reward_distribution()
         info = {}
         return self.quant, reward, done, info
 
@@ -242,7 +248,16 @@ class ATRPEnv(gym.Env):
         return pos_reward - neg_reward
 
     def _reward_distribution(self):
-        pass
+        chain = self.quant[self.index[self.reward_chain_type]]
+        if np.sum(chain) <= 0.0:
+            chain = np.ones(len(chain))
+        curr_dist = chain / np.sum(chain)
+        min_curr_dist = np.min(curr_dist[curr_dist > 0])
+        min_eps = min(self.dn_dist_eps, min_curr_dist)
+        curr_dist[curr_dist <= 0] = min_eps
+        curr_dist = curr_dist / np.sum(curr_dist)
+        kl_div = curr_dist.dot(np.log(curr_dist / self.dn_dist))
+        return -kl_div
 
     def _uncapped(self, key):
         unit = self.add_unit[key]
