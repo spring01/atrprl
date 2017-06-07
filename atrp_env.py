@@ -163,7 +163,7 @@ class ATRPEnv(gym.Env):
         self.added = self.init_amount.copy()
         self.quant = self.quant_init
         if self.reward_mode == 'chain length':
-            chain = self.quant[self.index[self.cl_chain]]
+            chain = self.quant[self.index[self.reward_chain_type]]
             self.last_reward_chain = chain[self.cl_slice]
         return self.quant / self.volume
 
@@ -231,7 +231,7 @@ class ATRPEnv(gym.Env):
         return max_diff < threshold and capped
 
     def _reward_chain_length(self):
-        chain = self.quant[self.index[self.cl_chain]]
+        chain = self.quant[self.index[self.reward_chain_type]]
         reward_chain = chain[self.cl_slice]
         diff_reward_chain = reward_chain - self.last_reward_chain
         diff_cl_num_mono = diff_reward_chain * self.cl_num_mono
@@ -240,6 +240,9 @@ class ATRPEnv(gym.Env):
         if pos_reward or neg_reward:
             self.last_reward_chain = reward_chain
         return pos_reward - neg_reward
+
+    def _reward_distribution(self):
+        pass
 
     def _uncapped(self, key):
         unit = self.add_unit[key]
