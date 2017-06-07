@@ -58,13 +58,15 @@ class ATRPEnv(gym.Env):
         (Other X_init, X_unit, X_cap variables have similar definitions.)
 
     Reward related:
-        reward_mode: 'chain length' (cl) or 'distribution' (dn, not implemented yet).
+        reward_mode:       'chain length' (cl) or 'distribution' (dn);
+        reward_chain_type: type of chain that the reward is related with.
     'chain length' mode:
-        cl_chain: desired chain type, 'dorm' or 'ter';
         cl_range: range of desired chain lengths
                   (left inclusive, right exclusive);
         cl_unit:  unit of change in equivalent amount of monomer
                   considered as rewarding.
+    'distribution' mode:
+        dn_dist:  desired distribution (of the rewarded chain type).
 
     '''
 
@@ -77,8 +79,9 @@ class ATRPEnv(gym.Env):
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=None,
-                 reward_mode='chain length',
-                 cl_chain='dorm', cl_range=(20, 30), cl_unit=0.01):
+                 reward_mode='chain length', reward_chain_type='dorm',
+                 cl_range=(20, 30), cl_unit=0.01,
+                 dn_dist=None):
         rate_constant = {K_POLY: k_poly, K_ACT: k_act, K_DORM: k_dorm}
         rate_constant[K_TER] = k_ter if termination else 0.0
         self.rate_constant = rate_constant
@@ -135,14 +138,23 @@ class ATRPEnv(gym.Env):
 
         # rewards
         self.reward_mode = reward_mode.lower()
-        self.cl_chain = cl_chain.lower()
-        self.cl_unit = cl_unit
-        if self.cl_chain == 'dorm':
-            start = 1
-        elif self.cl_chain == 'ter':
-            start = 2
-        self.cl_slice = slice(*(r - start for r in cl_range))
-        self.cl_num_mono = np.arange(*cl_range)
+        reward_chain_type = reward_chain_type.lower()
+        self.reward_chain_type = reward_chain_type
+        if self.reward_mode == 'chain length':
+            reward_chain_type = reward_chain_type.lower()
+            self.cl_unit = cl_unit
+            if reward_chain_type == DORM:
+                start = 1
+            elif reward_chain_type == TER:
+                start = 2
+            self.cl_slice = slice(*(r - start for r in cl_range))
+            self.cl_num_mono = np.arange(*cl_range)
+        elif self.reward_mode == 'distribution':
+            if dn_dist is None:
+                chain_slice = index[reward_chain_type]
+                dn_dist = np.ones(chain_slice.stop - chain_slice.start)
+                dn_dist /= np.sum(dn_dist)
+            self.dn_dist = dn_dist
 
         # rendering
         self.axes = None
