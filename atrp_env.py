@@ -175,7 +175,8 @@ class ATRPEnv(gym.Env):
         old_quant = self.quant.copy()
         self._take_action(action)
         conc = self.quant / self.volume
-        conc = odeint(self._atrp_diff, conc, self.ode_time)[1]
+        conc = odeint(self._atrp_diff, conc, self.ode_time,
+                      Dfun=self._atrp_diff_jac)[1]
         self.quant = conc * self.volume
         done = self._done(old_quant)
         if self.reward_mode == 'chain length':
@@ -333,6 +334,93 @@ class ATRPEnv(gym.Env):
             dvar[index[TER_B]] = kt2 * dvar_ter2
 
         return dvar
+
+    def _atrp_diff_jac(self, var, time):
+        max_rad_len = self.max_rad_len
+
+        rate_constant = self.rate_constant
+        k_poly = rate_constant[K_POLY]
+        k_act = rate_constant[K_ACT]
+        k_dorm = rate_constant[K_DORM]
+        k_ter = rate_constant[K_TER]
+
+        index = self.index
+        mono_index = index[MONO]
+        cu1_index = index[CU1]
+        cu2_index = index[CU2]
+        dorm_slice = index[DORM]
+        rad_slice = index[RAD]
+
+        mono = var[mono_index]
+        cu1 = var[cu1_index]
+        cu2 = var[cu2_index]
+        dorm = var[dorm_slice]
+        rad = var[rad_slice]
+
+        kt2 = 2 * k_ter
+        kp_mono = k_poly * mono
+        ka_cu1 = k_act * cu1
+        kd_cu2 = k_dorm * cu2
+        sum_rad = np.sum(rad)
+        kt2_rad = kt2 * rad
+
+        num_var = len(var)
+        jac = np.zeros((num_var, num_var))
+
+        # monomer
+        jac_mono = jac[mono_index]
+        jac_mono[mono_index] = -k_poly * sum_rad
+        jac_mono[rad_slice] = -kp_mono
+
+        # dormant chains
+        jac_dorm = jac[dorm_slice]
+        np.fill_diagonal(jac_dorm[:, dorm_slice], -ka_cu1)
+        np.fill_diagonal(jac_dorm[:, rad_slice], kd_cu2)
+
+        # Cu(I)
+        jac_cu1 = jac[cu1_index]
+        jac_cu1[cu1_index] = -k_act * np.sum(dorm)
+        jac_cu1[cu2_index] = k_dorm * sum_rad
+        jac_cu1[dorm_slice] = -ka_cu1
+        jac_cu1[rad_slice] = kd_cu2
+
+        # Cu(II)
+        jac[cu2_index] = -jac[cu1_index]
+
+        # radicals
+        jac_rad = jac[rad_slice]
+        jac_rad[:, mono_index] = -k_poly * rad
+        jac_rad[:, cu1_index] = k_act * dorm
+        jac_rad[:, cu2_index] = -k_dorm * rad
+        np.fill_diagonal(jac_rad[:, dorm_slice], ka_cu1)
+        jac_rad_rad = jac_rad[:, rad_slice]
+        np.fill_diagonal(jac_rad_rad, -(kp_mono + kd_cu2) - kt2_rad)
+        np.fill_diagonal(jac_rad_rad[1:, :-1], kp_mono)
+        jac_rad_rad -= kt2_rad[:, np.newaxis]
+
+        # terminated chains
+        if self.termination:
+            # length 2 to n
+            num_ter1 = max_rad_len - 1
+            jac_ter1 = jac[index[TER_A], rad_slice]
+            for p in xrange(num_ter1):
+                p_slice = slice(None, p + 1)
+                jac_ter1[p, p_slice] = rad[p_slice][::-1]
+            for p in xrange(0, num_ter1, 2):
+                jac_ter1[p, p / 2] *= 2
+            jac_ter1 *= kt2
+
+            # length n+1 to 2n
+            num_ter2 = max_rad_len
+            jac_ter2 = jac[index[TER_B], rad_slice]
+            for p in xrange(num_ter2):
+                p_slice = slice(p, None)
+                jac_ter2[p, p_slice] = rad[p_slice][::-1]
+            for p in xrange(0, num_ter2, 2):
+                jac_ter2[p, p / 2] *= 2
+            jac_ter2 *= kt2
+
+        return jac
 
     def _generate_plot(self, key):
         values = self.quant[self.index[key]]
