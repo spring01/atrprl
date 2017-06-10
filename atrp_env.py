@@ -300,8 +300,8 @@ class ATRPEnv(gym.Env):
         dvar[mono_index] = -kp_mono_sum_rad
 
         # dormant chains
-        dvar_dorm = (k_dorm * cu2) * rad - (k_act * cu1) * dorm
-        dvar[dorm_slice] = dvar_dorm
+        dvar_dorm = dvar[dorm_slice]
+        dvar_dorm[:] = (k_dorm * cu2) * rad - (k_act * cu1) * dorm
 
         # Cu(I)
         sum_dvar_dorm = np.sum(dvar_dorm)
@@ -311,27 +311,25 @@ class ATRPEnv(gym.Env):
         dvar[cu2_index] = -sum_dvar_dorm
 
         # radicals
-        dvar_rad = - dvar_dorm - kp_mono_rad - (kt2 * sum_rad) * rad
+        dvar_rad = dvar[rad_slice]
+        dvar_rad[:] = -dvar_dorm - kp_mono_rad - (kt2 * sum_rad) * rad
         dvar_rad[1:] += kp_mono_rad[:-1]
-        dvar[rad_slice] = dvar_rad
 
         # terminated chains
         if self.termination:
             # length 2 to n
-            num_ter1 = max_rad_len - 1
-            dvar_ter1 = np.zeros(num_ter1)
-            for p in xrange(num_ter1):
+            dvar_ter1 = dvar[index[TER_A]]
+            for p in xrange(max_rad_len - 1):
                 rad_part = rad[:(p + 1)]
                 dvar_ter1[p] = rad_part.dot(rad_part[::-1])
-            dvar[index[TER_A]] = kt2 * dvar_ter1
+            dvar_ter1 *= kt2
 
             # length n+1 to 2n
-            num_ter2 = max_rad_len
-            dvar_ter2 = np.zeros(num_ter2)
-            for p in xrange(num_ter2):
+            dvar_ter2 = dvar[index[TER_B]]
+            for p in xrange(max_rad_len):
                 rad_part = rad[p:]
                 dvar_ter2[p] = rad_part.dot(rad_part[::-1])
-            dvar[index[TER_B]] = kt2 * dvar_ter2
+            dvar_ter2 *= kt2
 
         return dvar
 
