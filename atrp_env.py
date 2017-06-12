@@ -127,7 +127,7 @@ class ATRPEnv(gym.Env):
         self.ode_time = np.array([0.0, timestep])
 
         # actions
-        action_tuple = tuple(spaces.Discrete(2) for _ in xrange(5))
+        action_tuple = tuple(spaces.Discrete(2) for _ in range(5))
         self.action_space = spaces.Tuple(action_tuple)
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
@@ -169,7 +169,7 @@ class ATRPEnv(gym.Env):
         if self.reward_mode == 'chain length':
             chain = self.quant[self.index[self.reward_chain_type]]
             self.last_reward_chain = chain[self.cl_slice]
-        return self.quant / self.volume
+        return self.quant
 
     def _step(self, action):
         old_quant = self.quant.copy()
@@ -319,14 +319,14 @@ class ATRPEnv(gym.Env):
         if self.termination:
             # length 2 to n
             dvar_ter1 = dvar[index[TER_A]]
-            for p in xrange(max_rad_len - 1):
+            for p in range(max_rad_len - 1):
                 rad_part = rad[:(p + 1)]
                 dvar_ter1[p] = rad_part.dot(rad_part[::-1])
             dvar_ter1 *= kt2
 
             # length n+1 to 2n
             dvar_ter2 = dvar[index[TER_B]]
-            for p in xrange(max_rad_len):
+            for p in range(max_rad_len):
                 rad_part = rad[p:]
                 dvar_ter2[p] = rad_part.dot(rad_part[::-1])
             dvar_ter2 *= kt2
@@ -401,21 +401,21 @@ class ATRPEnv(gym.Env):
             # length 2 to n
             num_ter1 = max_rad_len - 1
             jac_ter1 = jac[index[TER_A], rad_slice]
-            for p in xrange(num_ter1):
+            for p in range(num_ter1):
                 p_slice = slice(None, p + 1)
                 jac_ter1[p, p_slice] = rad[p_slice][::-1]
-            for p in xrange(0, num_ter1, 2):
-                jac_ter1[p, p / 2] *= 2
+            for p in range(0, num_ter1, 2):
+                jac_ter1[p, p // 2] *= 2
             jac_ter1 *= kt2
 
             # length n+1 to 2n
             num_ter2 = max_rad_len
             jac_ter2 = jac[index[TER_B], rad_slice]
-            for p in xrange(num_ter2):
+            for p in range(num_ter2):
                 p_slice = slice(p, None)
                 jac_ter2[p, p_slice] = rad[p_slice][::-1]
-            for p in xrange(0, num_ter2, 2):
-                jac_ter2[p, p / 2] *= 2
+            for p in range(0, num_ter2, 2):
+                jac_ter2[p, p // 2] *= 2
             jac_ter2 *= kt2
 
         return jac
