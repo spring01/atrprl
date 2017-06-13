@@ -50,6 +50,9 @@ class ATRPEnv(gym.Env):
         k_dorm: rate constant for (radical --> dormant chain);
         k_ter:  rate constant for (radical --> terminated chain).
 
+    Observation related:
+        observation_mode: 'all'.
+
     Action related:
         action_mode:
             'multi':  feeds multiple species in at each timestep;
@@ -77,7 +80,7 @@ class ATRPEnv(gym.Env):
 
     def __init__(self, timestep=1e1, max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
-                 action_mode='single',
+                 observation_mode='all', action_mode='single',
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
@@ -91,6 +94,9 @@ class ATRPEnv(gym.Env):
         self.rate_constant = rate_constant
         self.max_rad_len = max_rad_len
         self.termination = termination
+
+        # observation
+        self.observation_mode = observation_mode.lower()
 
         # variable indices (slices) for the ODE solver
         index = {MONO: 0, CU1: 1, CU2: 2, DORM1: 3}
@@ -179,22 +185,28 @@ class ATRPEnv(gym.Env):
         if self.reward_mode == 'chain length':
             chain = self.quant[self.index[self.reward_chain_type]]
             self.last_reward_chain = chain[self.cl_slice]
-        return self.quant
+        return self._observation_all()
 
     def _step(self, action):
         old_quant = self.quant.copy()
+        if self.action_mode == 'single':
+            action_list = [0] * self.action_space.n
+            action_list[action] = 1
+            action = tuple(action_list)
         self._take_action(action)
         conc = self.quant / self.volume
         conc = odeint(self._atrp_diff, conc, self.ode_time,
                       Dfun=self._atrp_diff_jac)[1]
         self.quant = conc * self.volume
+        if self.observation_mode == 'all':
+            observation = self._observation_all()
         done = self._done(old_quant)
         if self.reward_mode == 'chain length':
             reward = self._reward_chain_length()
         elif self.reward_mode == 'distribution':
             reward = self._reward_distribution()
         info = {}
-        return self.quant, reward, done, info
+        return observation, reward, done, info
 
     def _render(self, mode='human', close=False):
         if close:
@@ -222,10 +234,6 @@ class ATRPEnv(gym.Env):
         plt.pause(0.0001)
 
     def _take_action(self, action):
-        if self.action_mode == 'single':
-            action_list = [0] * self.action_space.n
-            action_list[action] = 1
-            action = tuple(action_list)
         self._add(action, MONO, change_volume=True)
         self._add(action, CU1)
         self._add(action, CU2)
@@ -244,6 +252,10 @@ class ATRPEnv(gym.Env):
         if action[SOL] and self._uncapped(SOL):
             self.volume += self.volume_unit[SOL]
             self.added[SOL] += self.add_unit[SOL]
+
+    def _observation_all(self):
+        uncapped = [self._uncapped(key) for key in [MONO, CU1, CU2, DORM1, SOL]]
+        return np.concatenate([uncapped, [self.volume], self.quant])
 
     def _done(self, old_quant):
         max_diff = np.max(np.abs(self.quant - old_quant))
