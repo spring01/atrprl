@@ -51,6 +51,9 @@ class ATRPEnv(gym.Env):
         k_ter:  rate constant for (radical --> terminated chain).
 
     Action related:
+        action_mode:
+            'multi':  feeds multiple species in at each timestep;
+            'single': feeds 1 species in at each timestep.
         mono_init:    initial quantity of monomer;
         mono_density: density of monomer (useful in calculating the volume);
         mono_unit:    unit amount of the "adding monomer" action;
@@ -74,6 +77,7 @@ class ATRPEnv(gym.Env):
 
     def __init__(self, timestep=1e1, max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
+                 action_mode='single',
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
@@ -127,8 +131,14 @@ class ATRPEnv(gym.Env):
         self.ode_time = np.array([0.0, timestep])
 
         # actions
-        action_tuple = tuple(spaces.Discrete(2) for _ in range(5))
-        self.action_space = spaces.Tuple(action_tuple)
+        action_mode = action_mode.lower()
+        self.action_mode = action_mode
+        if action_mode == 'multi':
+            action_tuple = tuple(spaces.Discrete(2) for _ in range(5))
+            action_space = spaces.Tuple(action_tuple)
+        elif action_mode == 'single':
+            action_space = spaces.Discrete(5)
+        self.action_space = action_space
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
         self.add_cap = {MONO: mono_cap, CU1: cu1_cap, CU2: cu2_cap,
@@ -212,6 +222,10 @@ class ATRPEnv(gym.Env):
         plt.pause(0.0001)
 
     def _take_action(self, action):
+        if self.action_mode == 'single':
+            action_list = [0] * self.action_space.n
+            action_list[action] = 1
+            action = tuple(action_list)
         self._add(action, MONO, change_volume=True)
         self._add(action, CU1)
         self._add(action, CU2)
