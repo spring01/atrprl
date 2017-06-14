@@ -27,7 +27,7 @@ RAD  = 'rad'
 TER  = 'ter'
 TER_A = 'ter_a'
 TER_B = 'ter_b'
-DORM_TER = 'dorm_ter'
+STABLE = 'dorm_ter'
 
 ''' epsilon for float comparison '''
 EPS = 1e-2
@@ -79,7 +79,8 @@ class ATRPEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, timestep=1e1, max_rad_len=100, termination=True,
+    def __init__(self, timestep=1e1, completion_timestep=1e5,
+                 max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
                  observation_mode='all', action_mode='single',
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
@@ -122,13 +123,12 @@ class ATRPEnv(gym.Env):
         observation_mode = observation_mode.lower()
         self.observation_mode = observation_mode
         if observation_mode == 'all':
-            # 'uncapped' indicator of 5 things that can be added, volume,
-            # and self.quant
-            obs_len = 6 + quant_len
+            # volume and self.quant
+            obs_len = 1 + quant_len
         if observation_mode == 'all stable':
-            # 'uncapped' indicator of 5 things that can be added, volume,
-            # summed quantity of all stable chains, Cu(I), and Cu(II)
-            obs_len = 6 + 2 * max_rad_len + 2
+            # volume, summed quantity of all stable chains, Cu(I), and Cu(II)
+            max_chain_len = 2 * max_rad_len if self.termination else max_rad_len
+            obs_len = 1 + max_chain_len + 2
         self.observation_space = spaces.Box(0, np.inf, shape=(obs_len,))
 
         # build initial variable and timestep
@@ -142,8 +142,8 @@ class ATRPEnv(gym.Env):
         quant_init[index[CU2]] = cu2_init
         quant_init[index[DORM1]] = dorm1_init
         self.quant_init = quant_init
-        self.timestep = timestep
         self.ode_time = np.array([0.0, timestep])
+        self.completion_time = np.array([0.0, completion_timestep])
 
         # actions
         action_mode = action_mode.lower()
@@ -197,21 +197,18 @@ class ATRPEnv(gym.Env):
         return self._observation()
 
     def _step(self, action):
-        old_quant = self.quant.copy()
         if self.action_mode == 'single':
             action_list = [0] * self.action_space.n
             action_list[action] = 1
             action = tuple(action_list)
         self._take_action(action)
+        done = self._done()
+        ode_time = self.completion_time if done else self.ode_time
         conc = self.quant / self.volume
-        conc = odeint(self._atrp, conc, self.ode_time, Dfun=self._atrp_jac)[1]
+        conc = odeint(self._atrp, conc, ode_time, Dfun=self._atrp_jac)[1]
         self.quant = conc * self.volume
         observation = self._observation()
-        done = self._done(old_quant)
-        if self.reward_mode == 'chain length':
-            reward = self._reward_chain_length()
-        elif self.reward_mode == 'distribution':
-            reward = self._reward_distribution()
+        reward = self._reward()
         info = {}
         return observation, reward, done, info
 
@@ -230,8 +227,8 @@ class ATRPEnv(gym.Env):
             self._generate_plot(RAD)
             if self.termination:
                 self._generate_plot(TER)
-                all_stable_chains = self._all_stable_chains()
-                self._generate_plot(DORM_TER, all_stable_chains)
+                stable_chains = self._stable_chains()
+                self._generate_plot(STABLE, stable_chains)
             plt.xlabel('Chain length')
             plt.tight_layout()
         else:
@@ -239,8 +236,8 @@ class ATRPEnv(gym.Env):
             self._update_plot(RAD)
             if self.termination:
                 self._update_plot(TER)
-                all_stable_chains = self._all_stable_chains()
-                self._update_plot(DORM_TER, all_stable_chains)
+                stable_chains = self._stable_chains()
+                self._update_plot(STABLE, stable_chains)
         plt.draw()
         plt.pause(0.0001)
 
@@ -252,7 +249,7 @@ class ATRPEnv(gym.Env):
         self._add_sol(action)
 
     def _add(self, action, key, change_volume=False):
-        if action[key] and self._uncapped(key):
+        if action[key] and not self._capped(key):
             unit = self.add_unit[key]
             self.quant[self.index[key]] += unit
             if change_volume:
@@ -260,70 +257,72 @@ class ATRPEnv(gym.Env):
             self.added[key] += unit
 
     def _add_sol(self, action):
-        if action[SOL] and self._uncapped(SOL):
+        if action[SOL] and not self._capped(SOL):
             self.volume += self.volume_unit[SOL]
             self.added[SOL] += self.add_unit[SOL]
 
     def _observation(self):
-        uncapped = [self._uncapped(key) for key in [MONO, CU1, CU2, DORM1, SOL]]
         if self.observation_mode == 'all':
-            obs = [uncapped, [self.volume], self.quant]
+            obs = [[self.volume], self.quant]
         elif self.observation_mode == 'all stable':
-            chains = self._all_stable_chains()
+            stable_chains = self._stable_chains()
             quant = self.quant
             index = self.index
             cu1 = quant[index[CU1]]
             cu2 = quant[index[CU2]]
-            obs = [uncapped, [self.volume], chains, [cu1], [cu2]]
+            obs = [[self.volume], stable_chains, [cu1], [cu2]]
         return np.concatenate(obs)
 
-    def _all_stable_chains(self):
+    def _stable_chains(self):
         quant = self.quant
         index = self.index
         max_rad_len = self.max_rad_len
         max_chain_len = 2 * max_rad_len if self.termination else max_rad_len
-        all_stable_chains = np.zeros(max_chain_len)
-        all_stable_chains[:max_rad_len] = quant[index[DORM]]
-        all_stable_chains[0] += quant[index[MONO]]
+        stable_chains = np.zeros(max_chain_len)
+        stable_chains[:max_rad_len] = quant[index[DORM]]
+        stable_chains[0] += quant[index[MONO]]
         if self.termination:
-            all_stable_chains[1:] += quant[index[TER]]
-        return all_stable_chains
+            stable_chains[1:] += quant[index[TER]]
+        return stable_chains
 
-    def _done(self, old_quant):
-        quant = self.quant
-        max_diff = np.max(np.abs(quant - old_quant))
-        threshold = np.max(np.abs(quant)) * EPS / self.timestep
-        capped = not self._uncapped(MONO) and not self._uncapped(SOL)
-        return max_diff < threshold and capped
+    def _done(self):
+        return all(self._capped(key) for key in [MONO, CU1, CU2, DORM1, SOL])
 
-    def _reward_chain_length(self):
-        chain = self.quant[self.index[self.reward_chain_type]]
-        reward_chain = chain[self.cl_slice]
-        diff_reward_chain = reward_chain - self.last_reward_chain
-        diff_cl_num_mono = diff_reward_chain * self.cl_num_mono
-        pos_reward = np.sum(diff_cl_num_mono > self.cl_unit)
-        neg_reward = np.sum(diff_cl_num_mono < -self.cl_unit)
-        if pos_reward or neg_reward:
-            self.last_reward_chain = reward_chain
-        return pos_reward - neg_reward
+    def _reward(self):
+        chain = self._chain()
+        if self.reward_mode == 'chain length':
+            reward_chain = chain[self.cl_slice]
+            diff_reward_chain = reward_chain - self.last_reward_chain
+            diff_cl_num_mono = diff_reward_chain * self.cl_num_mono
+            pos_reward = np.sum(diff_cl_num_mono > self.cl_unit)
+            neg_reward = np.sum(diff_cl_num_mono < -self.cl_unit)
+            if pos_reward or neg_reward:
+                self.last_reward_chain = reward_chain
+            return pos_reward - neg_reward
+        elif self.reward_mode == 'distribution':
+            if np.sum(chain) <= 0.0:
+                chain = np.ones(len(chain))
+            curr_dist = chain / np.sum(chain)
+            min_curr_dist = np.min(curr_dist[curr_dist > 0])
+            min_eps = min(self.dn_dist_eps, min_curr_dist)
+            curr_dist[curr_dist <= 0] = min_eps
+            curr_dist = curr_dist / np.sum(curr_dist)
+            kl_div = curr_dist.dot(np.log(curr_dist / self.dn_dist))
+            return -kl_div
 
-    def _reward_distribution(self):
-        chain = self.quant[self.index[self.reward_chain_type]]
-        if np.sum(chain) <= 0.0:
-            chain = np.ones(len(chain))
-        curr_dist = chain / np.sum(chain)
-        min_curr_dist = np.min(curr_dist[curr_dist > 0])
-        min_eps = min(self.dn_dist_eps, min_curr_dist)
-        curr_dist[curr_dist <= 0] = min_eps
-        curr_dist = curr_dist / np.sum(curr_dist)
-        kl_div = curr_dist.dot(np.log(curr_dist / self.dn_dist))
-        return -kl_div
+    def _chain(self):
+        chain_type = self.reward_chain_type
+        if chain_type in [RAD, DORM, TER]:
+            chain = self.quant[self.index[chain_type]]
+        elif chain_type == STABLE:
+            chain = self._stable_chains()
+        return chain
 
-    def _uncapped(self, key):
+    def _capped(self, key):
         unit = self.add_unit[key]
         added_eps = self.added[key] + unit * EPS
         cap = self.add_cap[key]
-        return cap is None or added_eps < cap
+        return cap is not None and added_eps > cap
 
     def _atrp(self, var, time):
         max_rad_len = self.max_rad_len
@@ -495,7 +494,7 @@ class ATRPEnv(gym.Env):
             space = np.linspace(2, len_values + 1, len_values)
             num = 3
             label = 'Terminated chains'
-        elif key == DORM_TER:
+        elif key == STABLE:
             space = np.linspace(2, len_values + 1, len_values)
             num = 4
             label = 'All stable chains'
