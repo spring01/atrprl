@@ -87,6 +87,7 @@ class ATRPEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, timestep=1e1, completion_timestep=1e5,
+                 max_completion_steps=10,
                  max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
                  observation_mode='all', action_mode='single',
@@ -155,6 +156,7 @@ class ATRPEnv(gym.Env):
         self.quant_init = quant_init
         self.ode_time = np.array([0.0, timestep])
         self.completion_time = np.array([0.0, completion_timestep])
+        self.max_completion_steps = max_completion_steps
 
         # actions
         action_mode = action_mode.lower()
@@ -217,13 +219,11 @@ class ATRPEnv(gym.Env):
         info = {}
         if done:
             index_mono = self.index[MONO]
-            completion_steps = 0
-            while True:
+            for step in range(self.max_completion_steps):
                 self.run_atrp(self.completion_time)
-                completion_steps += 1
                 if self.quant[index_mono] < np.max(self.quant) * EPS:
                     break
-            info['completion_steps'] = completion_steps
+            info['completion_steps'] = step + 1
         else:
             self.run_atrp(self.ode_time)
         observation = self.observation()
