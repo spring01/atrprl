@@ -30,7 +30,7 @@ TER_B = 'ter_b'
 STABLE = 'dorm_ter'
 
 ''' epsilon for float comparison '''
-EPS = 1e-2
+EPS = 1e-3
 
 class ATRPEnv(gym.Env):
 
@@ -127,6 +127,8 @@ class ATRPEnv(gym.Env):
 
         # observation
         quant_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
+        max_chain_len = 2 * max_rad_len if self.termination else max_rad_len
+        self.max_chain_len = max_chain_len
         observation_mode = observation_mode.lower()
         self.observation_mode = observation_mode
         if observation_mode == 'all':
@@ -136,7 +138,7 @@ class ATRPEnv(gym.Env):
         if observation_mode == 'all stable':
             # 'capped' indicator of [MONO, CU1, CU2, DORM1, SOL],
             # volume, summed quantity of all stable chains, Cu(I), and Cu(II)
-            max_chain_len = 2 * max_rad_len if self.termination else max_rad_len
+
             obs_len = 5 + 1 + max_chain_len + 2
         self.observation_space = spaces.Box(0, np.inf, shape=(obs_len,))
 
@@ -203,22 +205,29 @@ class ATRPEnv(gym.Env):
         if self.reward_mode == 'chain length':
             chain = self.quant[self.index[self.reward_chain_type]]
             self.last_reward_chain = chain[self.cl_slice]
-        return self._observation()
+        return self.observation()
 
     def _step(self, action):
         if self.action_mode == 'single':
             action_list = [0] * self.action_space.n
             action_list[action] = 1
             action = tuple(action_list)
-        self._take_action(action)
-        done = self._done()
-        ode_time = self.completion_time if done else self.ode_time
-        conc = self.quant / self.volume
-        conc = odeint(self._atrp, conc, ode_time, Dfun=self._atrp_jac)[1]
-        self.quant = conc * self.volume
-        observation = self._observation()
-        reward = self._reward()
+        self.take_action(action)
+        done = self.done()
         info = {}
+        if done:
+            index_mono = self.index[MONO]
+            completion_steps = 0
+            while True:
+                self.run_atrp(self.completion_time)
+                completion_steps += 1
+                if self.quant[index_mono] < np.max(self.quant) * EPS:
+                    break
+            info['completion_steps'] = completion_steps
+        else:
+            self.run_atrp(self.ode_time)
+        observation = self.observation()
+        reward = self.reward()
         return observation, reward, done, info
 
     def _render(self, mode='human', close=False):
@@ -231,51 +240,51 @@ class ATRPEnv(gym.Env):
         if self.axes is None:
             self.axes = {}
             self.plots = {}
-            self._generate_plot(DORM)
+            self.generate_plot(DORM)
             plt.title('Quantities')
-            self._generate_plot(RAD)
+            self.generate_plot(RAD)
             if self.termination:
-                self._generate_plot(TER)
-                stable_chains = self._stable_chains()
-                self._generate_plot(STABLE, stable_chains)
+                self.generate_plot(TER)
+                stable_chains = self.stable_chains()
+                self.generate_plot(STABLE, stable_chains)
             plt.xlabel('Chain length')
             plt.tight_layout()
         else:
-            self._update_plot(DORM)
-            self._update_plot(RAD)
+            self.update_plot(DORM)
+            self.update_plot(RAD)
             if self.termination:
-                self._update_plot(TER)
-                stable_chains = self._stable_chains()
-                self._update_plot(STABLE, stable_chains)
+                self.update_plot(TER)
+                stable_chains = self.stable_chains()
+                self.update_plot(STABLE, stable_chains)
         plt.draw()
         plt.pause(0.0001)
 
-    def _take_action(self, action):
-        self._add(action, MONO, change_volume=True)
-        self._add(action, CU1)
-        self._add(action, CU2)
-        self._add(action, DORM1)
-        self._add_sol(action)
+    def take_action(self, action):
+        self.add(action, MONO, change_volume=True)
+        self.add(action, CU1)
+        self.add(action, CU2)
+        self.add(action, DORM1)
+        self.add_sol(action)
 
-    def _add(self, action, key, change_volume=False):
-        if action[key] and not self._capped(key):
+    def add(self, action, key, change_volume=False):
+        if action[key] and not self.capped(key):
             unit = self.add_unit[key]
             self.quant[self.index[key]] += unit
             if change_volume:
                 self.volume += self.volume_unit[key]
             self.added[key] += unit
 
-    def _add_sol(self, action):
-        if action[SOL] and not self._capped(SOL):
+    def add_sol(self, action):
+        if action[SOL] and not self.capped(SOL):
             self.volume += self.volume_unit[SOL]
             self.added[SOL] += self.add_unit[SOL]
 
-    def _observation(self):
-        capped = [self._capped(key) for key in [MONO, CU1, CU2, DORM1, SOL]]
+    def observation(self):
+        capped = [self.capped(key) for key in [MONO, CU1, CU2, DORM1, SOL]]
         if self.observation_mode == 'all':
             obs = [capped, [self.volume], self.quant]
         elif self.observation_mode == 'all stable':
-            stable_chains = self._stable_chains()
+            stable_chains = self.stable_chains()
             quant = self.quant
             index = self.index
             cu1 = quant[index[CU1]]
@@ -283,23 +292,22 @@ class ATRPEnv(gym.Env):
             obs = [capped, [self.volume], stable_chains, [cu1], [cu2]]
         return np.concatenate(obs)
 
-    def _stable_chains(self):
+    def stable_chains(self):
         quant = self.quant
         index = self.index
         max_rad_len = self.max_rad_len
-        max_chain_len = 2 * max_rad_len if self.termination else max_rad_len
-        stable_chains = np.zeros(max_chain_len)
+        stable_chains = np.zeros(self.max_chain_len)
         stable_chains[:max_rad_len] = quant[index[DORM]]
         stable_chains[0] += quant[index[MONO]]
         if self.termination:
             stable_chains[1:] += quant[index[TER]]
         return stable_chains
 
-    def _done(self):
-        return all(self._capped(key) for key in [MONO, CU1, CU2, DORM1, SOL])
+    def done(self):
+        return all(self.capped(key) for key in [MONO, CU1, CU2, DORM1, SOL])
 
-    def _reward(self):
-        chain = self._chain(self.reward_chain_type)
+    def reward(self):
+        chain = self.chain(self.reward_chain_type)
         if self.reward_mode == 'chain length':
             reward_chain = chain[self.cl_slice]
             diff_reward_chain = reward_chain - self.last_reward_chain
@@ -320,20 +328,26 @@ class ATRPEnv(gym.Env):
             kl_div = curr_dist.dot(np.log(curr_dist / self.dn_dist))
             return -kl_div
 
-    def _chain(self, key):
+    def chain(self, key):
         if key in [RAD, DORM, TER]:
             chain = self.quant[self.index[key]]
         elif key == STABLE:
-            chain = self._stable_chains()
+            chain = self.stable_chains()
         return chain
 
-    def _capped(self, key):
+    def capped(self, key):
         unit = self.add_unit[key]
         added_eps = self.added[key] + unit * EPS
         cap = self.add_cap[key]
         return cap is not None and added_eps > cap
 
-    def _atrp(self, var, time):
+    def run_atrp(self, ode_time):
+        volume = self.volume
+        conc = self.quant / volume
+        conc = odeint(self.atrp, conc, ode_time, Dfun=self.atrp_jac)[1]
+        self.quant = conc * volume
+
+    def atrp(self, var, time):
         max_rad_len = self.max_rad_len
 
         rate_constant = self.rate_constant
@@ -400,7 +414,7 @@ class ATRPEnv(gym.Env):
 
         return dvar
 
-    def _atrp_jac(self, var, time):
+    def atrp_jac(self, var, time):
         max_rad_len = self.max_rad_len
 
         rate_constant = self.rate_constant
@@ -487,8 +501,8 @@ class ATRPEnv(gym.Env):
 
         return jac
 
-    def _generate_plot(self, key, values=None):
-        values = self._chain(key)
+    def generate_plot(self, key, values=None):
+        values = self.chain(key)
         len_values = len(values)
         if key == DORM:
             space = np.linspace(1, len_values, len_values)
@@ -510,10 +524,11 @@ class ATRPEnv(gym.Env):
         axis = plt.subplot(num_plots, 1, num)
         plot = axis.plot(space, values, label=label)[0]
         axis.legend()
+        axis.set_xlim([0, self.max_chain_len])
         self.axes[key] = axis
         self.plots[key] = plot
 
-    def _update_plot(self, key, values=None):
+    def update_plot(self, key, values=None):
         if values is None:
             values = self.quant[self.index[key]]
         self.axes[key].set_ylim([0, np.max(values) * 1.1])
