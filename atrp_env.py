@@ -27,6 +27,7 @@ RAD  = 'rad'
 TER  = 'ter'
 TER_A = 'ter_a'
 TER_B = 'ter_b'
+DORM_TER = 'dorm_ter'
 
 ''' epsilon for float comparison '''
 EPS = 1e-2
@@ -223,6 +224,8 @@ class ATRPEnv(gym.Env):
             self._generate_plot(RAD)
             if self.termination:
                 self._generate_plot(TER)
+                all_stable_quant = self._all_stable_quant()
+                self._generate_plot(DORM_TER, all_stable_quant)
             plt.xlabel('Chain length')
             plt.tight_layout()
         else:
@@ -230,6 +233,8 @@ class ATRPEnv(gym.Env):
             self._update_plot(RAD)
             if self.termination:
                 self._update_plot(TER)
+                all_stable_quant = self._all_stable_quant()
+                self._update_plot(DORM_TER, all_stable_quant)
         plt.draw()
         plt.pause(0.0001)
 
@@ -256,6 +261,17 @@ class ATRPEnv(gym.Env):
     def _observation_all(self):
         uncapped = [self._uncapped(key) for key in [MONO, CU1, CU2, DORM1, SOL]]
         return np.concatenate([uncapped, [self.volume], self.quant])
+
+    def _all_stable_quant(self):
+        quant = self.quant
+        index = self.index
+        dorm = quant[index[DORM]]
+        ter = quant[index[TER]]
+        max_rad_len = self.max_rad_len
+        all_quant = np.zeros(2 * max_rad_len)
+        all_quant[:max_rad_len] = dorm
+        all_quant[1:] += ter
+        return all_quant
 
     def _done(self, old_quant):
         max_diff = np.max(np.abs(self.quant - old_quant))
@@ -446,8 +462,9 @@ class ATRPEnv(gym.Env):
 
         return jac
 
-    def _generate_plot(self, key):
-        values = self.quant[self.index[key]]
+    def _generate_plot(self, key, values=None):
+        if values is None:
+            values = self.quant[self.index[key]]
         len_values = len(values)
         if key == DORM:
             space = np.linspace(1, len_values, len_values)
@@ -461,14 +478,20 @@ class ATRPEnv(gym.Env):
             space = np.linspace(2, len_values + 1, len_values)
             num = 3
             label = 'Terminated chains'
-        axis = plt.subplot(3, 1, num)
+        elif key == DORM_TER:
+            space = np.linspace(2, len_values + 1, len_values)
+            num = 4
+            label = 'All stable chains'
+        num_plots = 4 if self.termination else 2
+        axis = plt.subplot(num_plots, 1, num)
         plot = axis.plot(space, values, label=label)[0]
         axis.legend()
         self.axes[key] = axis
         self.plots[key] = plot
 
-    def _update_plot(self, key):
-        values = self.quant[self.index[key]]
+    def _update_plot(self, key, values=None):
+        if values is None:
+            values = self.quant[self.index[key]]
         self.axes[key].set_ylim([0, np.max(values) * 1.1])
         self.plots[key].set_ydata(values)
 
