@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 __all__ = ['ATRPEnv']
 
 ''' rate constants '''
-K_POLY = 0
-K_ACT  = 1
-K_DORM = 2
-K_TER  = 3
+K_POLY  = 0
+K_ACT   = 1
+K_DEACT = 2
+K_TER   = 3
 
 ''' indices and actions '''
 MONO  = 0
@@ -46,10 +46,10 @@ class ATRPEnv(gym.Env):
         ter   = [T2], ..., [T2n]    = quant[3+2*n:2+4*n] (optional).
 
     Rate constants:
-        k_poly: rate constant for (monomer consumption);
-        k_act:  rate constant for (dormant chain --> radical);
-        k_dorm: rate constant for (radical --> dormant chain);
-        k_ter:  rate constant for (radical --> terminated chain).
+        k_poly:  rate constant for (monomer consumption);
+        k_act:   rate constant for (dormant chain --> radical);
+        k_deact: rate constant for (radical --> dormant chain);
+        k_ter:   rate constant for (radical --> terminated chain).
 
     Observation related:
         observation_mode:
@@ -89,7 +89,7 @@ class ATRPEnv(gym.Env):
     def __init__(self, timestep=1e1, completion_timestep=1e5,
                  max_completion_steps=10,
                  max_rad_len=100, termination=True,
-                 k_poly=1e4, k_act=2e-2, k_dorm=1e5, k_ter=1e10,
+                 k_poly=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
                  observation_mode='all', action_mode='single',
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
@@ -99,7 +99,7 @@ class ATRPEnv(gym.Env):
                  reward_mode='chain length', reward_chain_type='dorm',
                  cl_range=(20, 30), cl_unit=0.01,
                  dn_dist=None):
-        rate_constant = {K_POLY: k_poly, K_ACT: k_act, K_DORM: k_dorm}
+        rate_constant = {K_POLY: k_poly, K_ACT: k_act, K_DEACT: k_deact}
         rate_constant[K_TER] = k_ter if termination else 0.0
         self.rate_constant = rate_constant
         self.max_rad_len = max_rad_len
@@ -129,6 +129,9 @@ class ATRPEnv(gym.Env):
         # observation
         quant_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
         max_chain_len = 2 * max_rad_len if self.termination else max_rad_len
+        self.rad_chain_lengths = np.arange(1, 1 + max_rad_len)
+        if termination:
+            self.ter_chain_lengths = np.arange(2, 1 + 2 * max_rad_len)
         self.max_chain_len = max_chain_len
         observation_mode = observation_mode.lower()
         self.observation_mode = observation_mode
@@ -154,9 +157,8 @@ class ATRPEnv(gym.Env):
         quant_init[index[CU2]] = cu2_init
         quant_init[index[DORM1]] = dorm1_init
         self.quant_init = quant_init
-        self.ode_time = np.array([0.0, timestep])
+        self.step_time = np.array([0.0, timestep])
         self.completion_time = np.array([0.0, completion_timestep])
-        self.max_completion_steps = max_completion_steps
 
         # actions
         action_mode = action_mode.lower()
@@ -178,25 +180,22 @@ class ATRPEnv(gym.Env):
         self.reward_mode = reward_mode.lower()
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
+        if reward_chain_type == DORM or reward_chain_type == STABLE:
+            chain_min = 1
+        elif reward_chain_type == TER:
+            chain_min = 2
         if self.reward_mode == 'chain length':
             reward_chain_type = reward_chain_type.lower()
             self.cl_unit = cl_unit
-            if reward_chain_type == DORM:
-                start = 1
-            elif reward_chain_type == TER:
-                start = 2
-            self.cl_slice = slice(*(r - start for r in cl_range))
+            self.cl_slice = slice(*(r - chain_min for r in cl_range))
             self.cl_num_mono = np.arange(*cl_range)
         elif self.reward_mode == 'distribution':
             if dn_dist is None:
                 chain_slice = index[reward_chain_type]
                 dn_dist = np.ones(chain_slice.stop - chain_slice.start)
-                dn_dist /= np.sum(dn_dist)
-            dn_dist = dn_dist.copy()
-            dn_dist_eps = min(1e-16, np.min(dn_dist[dn_dist > 0]))
-            self.dn_dist_eps = dn_dist[dn_dist == 0] = dn_dist_eps
-            dn_dist /= np.sum(dn_dist)
-            self.dn_dist = dn_dist
+            dn_num_mono = np.arange(chain_min, chain_min + len(dn_dist))
+            dn_mono_quant = dn_dist.dot(dn_num_mono)
+            self.dn_target_quant = dn_dist / dn_mono_quant * mono_cap
 
         # rendering
         self.axes = None
@@ -218,16 +217,11 @@ class ATRPEnv(gym.Env):
         done = self.done()
         info = {}
         if done:
-            index_mono = self.index[MONO]
-            for step in range(self.max_completion_steps):
-                self.run_atrp(self.completion_time)
-                if self.quant[index_mono] < np.max(self.quant) * EPS:
-                    break
-            info['completion_steps'] = step + 1
+            self.run_atrp(self.completion_time)
         else:
-            self.run_atrp(self.ode_time)
+            self.run_atrp(self.step_time)
         observation = self.observation()
-        reward = self.reward()
+        reward = self.reward(done)
         return observation, reward, done, info
 
     def _render(self, mode='human', close=False):
@@ -306,7 +300,7 @@ class ATRPEnv(gym.Env):
     def done(self):
         return all(self.capped(key) for key in [MONO, CU1, CU2, DORM1, SOL])
 
-    def reward(self):
+    def reward(self, done):
         chain = self.chain(self.reward_chain_type)
         if self.reward_mode == 'chain length':
             reward_chain = chain[self.cl_slice]
@@ -318,15 +312,21 @@ class ATRPEnv(gym.Env):
                 self.last_reward_chain = reward_chain
             return pos_reward - neg_reward
         elif self.reward_mode == 'distribution':
-            if np.sum(chain) <= 0.0:
-                chain = np.ones(len(chain))
-            curr_dist = chain / np.sum(chain)
-            min_curr_dist = np.min(curr_dist[curr_dist > 0])
-            min_eps = min(self.dn_dist_eps, min_curr_dist)
-            curr_dist[curr_dist <= 0] = min_eps
-            curr_dist = curr_dist / np.sum(curr_dist)
-            kl_div = curr_dist.dot(np.log(curr_dist / self.dn_dist))
-            return -kl_div
+            diff = chain - self.dn_target_quant
+            reward = -diff.dot(diff)
+            if done:
+                reward *= self.completion_time[-1] / self.step_time[-1]
+            return reward
+
+            #~ if np.sum(chain) <= 0.0:
+                #~ chain = np.ones(len(chain))
+            #~ curr_dist = chain / np.sum(chain)
+            #~ min_curr_dist = np.min(curr_dist[curr_dist > 0])
+            #~ min_eps = min(self.dn_dist_eps, min_curr_dist)
+            #~ curr_dist[curr_dist <= 0] = min_eps
+            #~ curr_dist = curr_dist / np.sum(curr_dist)
+            #~ kl_div = curr_dist.dot(np.log(curr_dist / self.dn_dist))
+            #~ return -kl_div
 
     def chain(self, key):
         if key in [RAD, DORM, TER]:
@@ -341,11 +341,24 @@ class ATRPEnv(gym.Env):
         cap = self.add_cap[key]
         return cap is not None and added_eps > cap
 
-    def run_atrp(self, ode_time):
+    def run_atrp(self, step_time):
+        # solve atrp odes to get new concentration
         volume = self.volume
         conc = self.quant / volume
-        conc = odeint(self.atrp, conc, ode_time, Dfun=self.atrp_jac)[1]
-        self.quant = conc * volume
+        conc = odeint(self.atrp, conc, step_time, Dfun=self.atrp_jac)[-1]
+        quant = conc * volume
+
+        # adjust 'quant' so that the monomer amount is conserved
+        index = self.index
+        mono = quant[index[MONO]]
+        dorm = quant[index[DORM]]
+        rad = quant[index[RAD]]
+        quant_eq_mono = mono + (dorm + rad).dot(self.rad_chain_lengths)
+        if self.termination:
+            quant_eq_mono += quant[index[TER]].dot(self.ter_chain_lengths)
+        added = self.added
+        ref_quant_eq_mono = added[MONO] + added[DORM1]
+        self.quant = quant * ref_quant_eq_mono / quant_eq_mono
 
     def atrp(self, var, time):
         max_rad_len = self.max_rad_len
@@ -353,7 +366,7 @@ class ATRPEnv(gym.Env):
         rate_constant = self.rate_constant
         k_poly = rate_constant[K_POLY]
         k_act = rate_constant[K_ACT]
-        k_dorm = rate_constant[K_DORM]
+        k_deact = rate_constant[K_DEACT]
         k_ter = rate_constant[K_TER]
 
         index = self.index
@@ -382,7 +395,7 @@ class ATRPEnv(gym.Env):
 
         # dormant chains
         dvar_dorm = dvar[dorm_slice]
-        dvar_dorm[:] = (k_dorm * cu2) * rad - (k_act * cu1) * dorm
+        dvar_dorm[:] = (k_deact * cu2) * rad - (k_act * cu1) * dorm
 
         # Cu(I)
         sum_dvar_dorm = np.sum(dvar_dorm)
@@ -420,7 +433,7 @@ class ATRPEnv(gym.Env):
         rate_constant = self.rate_constant
         k_poly = rate_constant[K_POLY]
         k_act = rate_constant[K_ACT]
-        k_dorm = rate_constant[K_DORM]
+        k_deact = rate_constant[K_DEACT]
         k_ter = rate_constant[K_TER]
 
         index = self.index
@@ -439,7 +452,7 @@ class ATRPEnv(gym.Env):
         kt2 = 2 * k_ter
         kp_mono = k_poly * mono
         ka_cu1 = k_act * cu1
-        kd_cu2 = k_dorm * cu2
+        kd_cu2 = k_deact * cu2
         sum_rad = np.sum(rad)
         kt2_rad = kt2 * rad
 
@@ -459,7 +472,7 @@ class ATRPEnv(gym.Env):
         # Cu(I)
         jac_cu1 = jac[cu1_index]
         jac_cu1[cu1_index] = -k_act * np.sum(dorm)
-        jac_cu1[cu2_index] = k_dorm * sum_rad
+        jac_cu1[cu2_index] = k_deact * sum_rad
         jac_cu1[dorm_slice] = -ka_cu1
         jac_cu1[rad_slice] = kd_cu2
 
@@ -470,7 +483,7 @@ class ATRPEnv(gym.Env):
         jac_rad = jac[rad_slice]
         jac_rad[:, mono_index] = -k_poly * rad
         jac_rad[:, cu1_index] = k_act * dorm
-        jac_rad[:, cu2_index] = -k_dorm * rad
+        jac_rad[:, cu2_index] = -k_deact * rad
         np.fill_diagonal(jac_rad[:, dorm_slice], ka_cu1)
         jac_rad_rad = jac_rad[:, rad_slice]
         np.fill_diagonal(jac_rad_rad, -(kp_mono + kd_cu2) - kt2_rad)
@@ -505,24 +518,28 @@ class ATRPEnv(gym.Env):
         values = self.chain(key)
         len_values = len(values)
         if key == DORM:
-            space = np.linspace(1, len_values, len_values)
+            linspace = np.linspace(1, len_values, len_values)
             num = 1
             label = 'Dormant chains'
         elif key == RAD:
-            space = np.linspace(1, len_values, len_values)
+            linspace = np.linspace(1, len_values, len_values)
             num = 2
             label = 'Radical chains'
         elif key == TER:
-            space = np.linspace(2, len_values + 1, len_values)
+            linspace = np.linspace(2, len_values + 1, len_values)
             num = 3
             label = 'Terminated chains'
         elif key == STABLE:
-            space = np.linspace(2, len_values + 1, len_values)
+            linspace = np.linspace(1, len_values, len_values)
             num = 4
             label = 'All stable chains'
         num_plots = 4 if self.termination else 2
         axis = plt.subplot(num_plots, 1, num)
-        plot = axis.plot(space, values, label=label)[0]
+        plot = axis.plot(linspace, values, label=label)[0]
+        if self.reward_mode == 'distribution':
+            if key == self.reward_chain_type:
+                axis.plot(linspace, self.dn_target_quant, 'r',
+                          label='Target distribution')
         axis.legend()
         axis.set_xlim([0, self.max_chain_len])
         self.axes[key] = axis
