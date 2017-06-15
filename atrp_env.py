@@ -142,7 +142,6 @@ class ATRPEnv(gym.Env):
         if observation_mode == 'all stable':
             # 'capped' indicator of [MONO, CU1, CU2, DORM1, SOL],
             # volume, summed quantity of all stable chains, Cu(I), and Cu(II)
-
             obs_len = 5 + 1 + max_chain_len + 2
         self.observation_space = spaces.Box(0, np.inf, shape=(obs_len,))
 
@@ -317,16 +316,6 @@ class ATRPEnv(gym.Env):
             if done:
                 reward *= self.completion_time[-1] / self.step_time[-1]
             return reward
-
-            #~ if np.sum(chain) <= 0.0:
-                #~ chain = np.ones(len(chain))
-            #~ curr_dist = chain / np.sum(chain)
-            #~ min_curr_dist = np.min(curr_dist[curr_dist > 0])
-            #~ min_eps = min(self.dn_dist_eps, min_curr_dist)
-            #~ curr_dist[curr_dist <= 0] = min_eps
-            #~ curr_dist = curr_dist / np.sum(curr_dist)
-            #~ kl_div = curr_dist.dot(np.log(curr_dist / self.dn_dist))
-            #~ return -kl_div
 
     def chain(self, key):
         if key in [RAD, DORM, TER]:
@@ -538,8 +527,9 @@ class ATRPEnv(gym.Env):
         plot = axis.plot(linspace, values, label=label)[0]
         if self.reward_mode == 'distribution':
             if key == self.reward_chain_type:
-                axis.plot(linspace, self.dn_target_quant, 'r',
-                          label='Target distribution')
+                target_quant = self.dn_target_quant
+                target_label = 'Target distribution'
+                axis.plot(linspace, target_quant, 'r', label=target_label)
         axis.legend()
         axis.set_xlim([0, self.max_chain_len])
         self.axes[key] = axis
