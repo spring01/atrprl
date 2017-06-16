@@ -86,7 +86,7 @@ class ATRPEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, timestep=1e1, completion_timestep=1e5,
+    def __init__(self, timestep=1e1, completion_time=1e5,
                  max_completion_steps=10,
                  max_rad_len=100, termination=True,
                  k_poly=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
@@ -157,7 +157,7 @@ class ATRPEnv(gym.Env):
         quant_init[index[DORM1]] = dorm1_init
         self.quant_init = quant_init
         self.step_time = np.array([0.0, timestep])
-        self.completion_time = np.array([0.0, completion_timestep])
+        self.completion_time = np.arange(0.0, completion_time + EPS, timestep)
 
         # actions
         action_mode = action_mode.lower()
@@ -186,7 +186,8 @@ class ATRPEnv(gym.Env):
         if self.reward_mode == 'chain length':
             reward_chain_type = reward_chain_type.lower()
             self.cl_unit = cl_unit
-            self.cl_slice = slice(*(r - chain_min for r in cl_range))
+            start, end = cl_range[0] - chain_min, cl_range[1] - chain_min
+            self.cl_slice = slice(start, end)
             self.cl_num_mono = np.arange(*cl_range)
         elif self.reward_mode == 'distribution':
             if dn_dist is None:
@@ -216,11 +217,11 @@ class ATRPEnv(gym.Env):
         done = self.done()
         info = {}
         if done:
-            self.run_atrp(self.completion_time)
+            reward = self.run_atrp(self.completion_time)
         else:
-            self.run_atrp(self.step_time)
+            reward = self.run_atrp(self.step_time)
         observation = self.observation()
-        reward = self.reward(done)
+        #~ reward = self.reward(done)
         return observation, reward, done, info
 
     def _render(self, mode='human', close=False):
@@ -299,23 +300,16 @@ class ATRPEnv(gym.Env):
     def done(self):
         return all(self.capped(key) for key in [MONO, CU1, CU2, DORM1, SOL])
 
-    def reward(self, done):
+    def reward(self):
         chain = self.chain(self.reward_chain_type)
         if self.reward_mode == 'chain length':
             reward_chain = chain[self.cl_slice]
             diff_reward_chain = reward_chain - self.last_reward_chain
-            diff_cl_num_mono = diff_reward_chain * self.cl_num_mono
-            pos_reward = np.sum(diff_cl_num_mono > self.cl_unit)
-            neg_reward = np.sum(diff_cl_num_mono < -self.cl_unit)
-            if pos_reward or neg_reward:
-                self.last_reward_chain = reward_chain
-            return pos_reward - neg_reward
+            self.last_reward_chain = reward_chain
+            return diff_reward_chain.dot(self.cl_num_mono)
         elif self.reward_mode == 'distribution':
             diff = chain - self.dn_target_quant
-            reward = -diff.dot(diff)
-            if done:
-                reward *= self.completion_time[-1] / self.step_time[-1]
-            return reward
+            return -diff.dot(diff)
 
     def chain(self, key):
         if key in [RAD, DORM, TER]:
@@ -334,20 +328,25 @@ class ATRPEnv(gym.Env):
         # solve atrp odes to get new concentration
         volume = self.volume
         conc = self.quant / volume
-        conc = odeint(self.atrp, conc, step_time, Dfun=self.atrp_jac)[-1]
+        conc = odeint(self.atrp, conc, step_time, Dfun=self.atrp_jac)[1:]
         quant = conc * volume
 
         # adjust 'quant' so that the monomer amount is conserved
         index = self.index
-        mono = quant[index[MONO]]
-        dorm = quant[index[DORM]]
-        rad = quant[index[RAD]]
-        quant_eq_mono = mono + (dorm + rad).dot(self.rad_chain_lengths)
-        if self.termination:
-            quant_eq_mono += quant[index[TER]].dot(self.ter_chain_lengths)
         added = self.added
         ref_quant_eq_mono = added[MONO] + added[DORM1]
-        self.quant = quant * ref_quant_eq_mono / quant_eq_mono
+        reward = 0.0
+        for qt in quant:
+            mono = qt[index[MONO]]
+            dorm = qt[index[DORM]]
+            rad = qt[index[RAD]]
+            quant_eq_mono = mono + (dorm + rad).dot(self.rad_chain_lengths)
+            if self.termination:
+                quant_eq_mono += qt[index[TER]].dot(self.ter_chain_lengths)
+            qt *= ref_quant_eq_mono / quant_eq_mono
+            self.quant = qt
+            reward += self.reward()
+        return reward
 
     def atrp(self, var, time):
         max_rad_len = self.max_rad_len
