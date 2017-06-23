@@ -2,3 +2,4 @@ numpy
 scipy
 matplotlib
 gym
+tensorflow>=1.1
