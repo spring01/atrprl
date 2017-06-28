@@ -105,7 +105,7 @@ from common.util import get_output_folder
 from atrp import ATRPEnv
 
 def worker(args):
-    os.environ['OMP_NUM_THREADS'] = '1'
+
     # environment
     env = ATRPEnv(max_rad_len=70, timestep=1e1,
                   termination=False, k_ter=1e8,
@@ -183,4 +183,5 @@ def worker(args):
 
 
 if __name__ == '__main__':
+    os.environ['OMP_NUM_THREADS'] = '1'
     main()
