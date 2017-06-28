@@ -3,4 +3,7 @@ env
 play.*
 *.nb
 __pycache__
+output
+*.p
+trash
 
