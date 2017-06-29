@@ -46,7 +46,7 @@ class ATRPEnv(gym.Env):
         ter   = [T2], ..., [T2n]    = quant[3+2*n:2+4*n] (optional).
 
     Rate constants:
-        k_poly:  rate constant for (monomer consumption);
+        k_prop:  rate constant for (monomer consumption);
         k_act:   rate constant for (dormant chain --> radical);
         k_deact: rate constant for (radical --> dormant chain);
         k_ter:   rate constant for (radical --> terminated chain).
@@ -89,7 +89,7 @@ class ATRPEnv(gym.Env):
     def __init__(self, timestep=1e1, completion_time=1e5,
                  max_completion_steps=10,
                  max_rad_len=100, termination=True,
-                 k_poly=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
+                 k_prop=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
                  observation_mode='all', action_mode='single',
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
@@ -99,7 +99,7 @@ class ATRPEnv(gym.Env):
                  reward_mode='chain length', reward_chain_type='dorm',
                  cl_range=(20, 30), cl_unit=0.01,
                  dn_dist=None):
-        rate_constant = {K_POLY: k_poly, K_ACT: k_act, K_DEACT: k_deact}
+        rate_constant = {K_POLY: k_prop, K_ACT: k_act, K_DEACT: k_deact}
         rate_constant[K_TER] = k_ter if termination else 0.0
         self.rate_constant = rate_constant
         self.max_rad_len = max_rad_len
@@ -221,7 +221,6 @@ class ATRPEnv(gym.Env):
         else:
             reward = self.run_atrp(self.step_time)
         observation = self.observation()
-        #~ reward = self.reward(done)
         return observation, reward, done, info
 
     def _render(self, mode='human', close=False):
@@ -352,7 +351,7 @@ class ATRPEnv(gym.Env):
         max_rad_len = self.max_rad_len
 
         rate_constant = self.rate_constant
-        k_poly = rate_constant[K_POLY]
+        k_prop = rate_constant[K_POLY]
         k_act = rate_constant[K_ACT]
         k_deact = rate_constant[K_DEACT]
         k_ter = rate_constant[K_TER]
@@ -373,7 +372,7 @@ class ATRPEnv(gym.Env):
         dvar = np.zeros(len(var))
 
         kt2 = 2 * k_ter
-        kp_mono = k_poly * mono
+        kp_mono = k_prop * mono
         kp_mono_rad = kp_mono * rad
         sum_rad = np.sum(rad)
         kp_mono_sum_rad = kp_mono * sum_rad
@@ -419,7 +418,7 @@ class ATRPEnv(gym.Env):
         max_rad_len = self.max_rad_len
 
         rate_constant = self.rate_constant
-        k_poly = rate_constant[K_POLY]
+        k_prop = rate_constant[K_POLY]
         k_act = rate_constant[K_ACT]
         k_deact = rate_constant[K_DEACT]
         k_ter = rate_constant[K_TER]
@@ -438,7 +437,7 @@ class ATRPEnv(gym.Env):
         rad = var[rad_slice]
 
         kt2 = 2 * k_ter
-        kp_mono = k_poly * mono
+        kp_mono = k_prop * mono
         ka_cu1 = k_act * cu1
         kd_cu2 = k_deact * cu2
         sum_rad = np.sum(rad)
@@ -449,7 +448,7 @@ class ATRPEnv(gym.Env):
 
         # monomer
         jac_mono = jac[mono_index]
-        jac_mono[mono_index] = -k_poly * sum_rad
+        jac_mono[mono_index] = -k_prop * sum_rad
         jac_mono[rad_slice] = -kp_mono
 
         # dormant chains
@@ -469,7 +468,7 @@ class ATRPEnv(gym.Env):
 
         # radicals
         jac_rad = jac[rad_slice]
-        jac_rad[:, mono_index] = -k_poly * rad
+        jac_rad[:, mono_index] = -k_prop * rad
         jac_rad[:, cu1_index] = k_act * dorm
         jac_rad[:, cu2_index] = -k_deact * rad
         np.fill_diagonal(jac_rad[:, dorm_slice], ka_cu1)
