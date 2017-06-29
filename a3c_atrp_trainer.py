@@ -96,13 +96,13 @@ import os
 import signal
 import gym
 import tensorflow as tf
-from a3c.a3c import A3C
-from a3c.rollout import Rollout
-from a3c.step_counter import StepCounter
-from common.policy import Stochastic
-from common.neuralnet.acnet import ACNet
-from common.util import get_output_folder
-from simple_nets import simple_acnet
+from hcdrl.a3c.a3c import A3C
+from hcdrl.a3c.rollout import Rollout
+from hcdrl.a3c.step_counter import StepCounter
+from hcdrl.common.policy import Stochastic
+from hcdrl.common.neuralnet.acnet import ACNet
+from hcdrl.common.util import get_output_folder
+from hcdrl.simple_nets import simple_acnet
 from atrp import ATRPEnv
 
 def worker(args):
