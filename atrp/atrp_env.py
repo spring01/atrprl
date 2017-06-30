@@ -149,7 +149,7 @@ class ATRPEnv(gym.Env):
         self.init_amount = {MONO: mono_init, CU1: cu1_init, CU2: cu2_init,
                             DORM1: dorm1_init, SOL: sol_init}
         self.density = {MONO: mono_density, SOL: sol_density}
-        self.volume = volume = mono_init / mono_density + sol_init / sol_density
+        self.volume = mono_init / mono_density + sol_init / sol_density
         quant_init = np.zeros(quant_len)
         quant_init[index[MONO]] = mono_init
         quant_init[index[CU1]] = cu1_init
@@ -342,7 +342,8 @@ class ATRPEnv(gym.Env):
             quant_eq_mono = mono + (dorm + rad).dot(self.rad_chain_lengths)
             if self.termination:
                 quant_eq_mono += qt[index[TER]].dot(self.ter_chain_lengths)
-            qt *= ref_quant_eq_mono / quant_eq_mono
+            ratio = ref_quant_eq_mono / quant_eq_mono if quant_eq_mono else 1.0
+            qt *= ratio
             self.quant = qt
             reward += self.reward()
         return reward
