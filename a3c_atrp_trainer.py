@@ -56,7 +56,7 @@ def arguments():
         help='Maximum length of partial rollout to calculate value target')
 
     # neural net arguments
-    parser.add_argument('--net_arch', nargs='+', type=int, default=(100,),
+    parser.add_argument('--net_arch', nargs='+', type=int, default=[100],
         help='Neural net architecture')
 
     # parse arguments
