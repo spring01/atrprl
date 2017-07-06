@@ -3,6 +3,9 @@ ATRP deep RL with asynchronous advantage actor-critic (A3C)
 Built with distributed tensorflow
 """
 
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+
 ''' main function selects running mode '''
 def main():
     args = arguments()
@@ -92,7 +95,6 @@ def trainer(args):
 
 
 ''' worker block '''
-import os
 import signal
 import gym
 import tensorflow as tf
@@ -176,5 +178,4 @@ def worker(args):
 
 
 if __name__ == '__main__':
-    os.environ['OMP_NUM_THREADS'] = '1'
     main()

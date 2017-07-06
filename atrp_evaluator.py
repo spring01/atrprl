@@ -4,6 +4,7 @@ Supports both DQN and A3C
 """
 
 import os
+os.environ['OMP_NUM_THREADS'] = '1'
 import gym
 import argparse
 import numpy as np
@@ -99,5 +100,4 @@ def main():
 
 
 if __name__ == "__main__":
-    os.environ['OMP_NUM_THREADS'] = '1'
     main()
