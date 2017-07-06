@@ -15,13 +15,15 @@ def main():
         worker(args)
 
 
-ENV = 'ATRP-polystyrene-v0'
-
 ''' arguments block '''
 import argparse
 
 def arguments():
     parser = argparse.ArgumentParser(description='A3C ATRP')
+
+    # environment name
+    parser.add_argument('--env', default='ATRP-polystyrene-v0',
+        help='Environment name')
 
     # A3C arguments
     parser.add_argument('--a3c_running_mode', default='trainer', type=str,
@@ -110,7 +112,7 @@ import atrp_ps
 def worker(args):
 
     # environment
-    env = gym.make(ENV)
+    env = gym.make(args.env)
     input_shape = env.observation_space.shape
     num_actions = env.action_space.n
 
@@ -165,7 +167,7 @@ def worker(args):
 
         # set output path if this is the master worker
         if is_master:
-            output = get_output_folder(args.rl_save_path, ENV)
+            output = get_output_folder(args.rl_save_path, args.env)
             agent.set_output(output)
 
         # train the agent
