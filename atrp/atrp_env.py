@@ -120,8 +120,7 @@ class ATRPEnv(gym.Env):
         self.observation_mode = observation_mode.lower()
         self.init_amount = {MONO: mono_init, CU1: cu1_init, CU2: cu2_init,
                             DORM1: dorm1_init, SOL: sol_init}
-        self.density = {MONO: mono_density, SOL: sol_density}
-        self.volume = mono_init / mono_density + sol_init / sol_density
+        self.volume_init = mono_init / mono_density + sol_init / sol_density
         self.quant_init = self.init_quant()
 
         # actions
@@ -172,6 +171,7 @@ class ATRPEnv(gym.Env):
         self.step_count = 0
         self.added = self.init_amount.copy()
         self.quant = self.quant_init
+        self.volume = self.volume_init
         if self.reward_mode == 'chain length':
             chain = self.quant[self.index[self.reward_chain_type]]
             self.last_reward_chain = chain[self.cl_slice]
@@ -297,7 +297,7 @@ class ATRPEnv(gym.Env):
             self.added[SOL] += self.add_unit[SOL]
 
     def observation(self):
-        capped = [self.capped(key) for key in [MONO, CU1, CU2, DORM1, SOL]]
+        capped = [self.capped(key) for key in (MONO, CU1, CU2, DORM1, SOL)]
         if self.observation_mode == 'all':
             obs = [capped, [self.volume], self.quant]
         elif self.observation_mode == 'all stable':
@@ -322,8 +322,7 @@ class ATRPEnv(gym.Env):
 
     def done(self):
         min_steps_exceeded = self.step_count >= self.min_steps
-        species = MONO, CU1, CU2, DORM1, SOL
-        all_capped = all(self.capped(key) for key in species)
+        all_capped = all(self.capped(s) for s in (MONO, CU1, CU2, DORM1, SOL))
         return min_steps_exceeded and all_capped
 
     def run_atrp(self, step_time):
@@ -564,6 +563,6 @@ class ATRPEnv(gym.Env):
     def update_plot(self, key, values=None):
         if values is None:
             values = self.quant[self.index[key]]
-        self.axes[key].set_ylim([0, np.max(values) * 1.1])
+        self.axes[key].set_ylim([0, np.max(values) + EPS])
         self.plots[key].set_ydata(values)
 
