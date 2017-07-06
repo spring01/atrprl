@@ -2,7 +2,7 @@
 import gym
 from gym import spaces
 import numpy as np
-from scipy.integrate import odeint
+from scipy.integrate import ode
 import matplotlib.pyplot as plt
 
 
@@ -86,9 +86,8 @@ class ATRPEnv(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, timestep=1e1, completion_time=1e5,
-                 max_completion_steps=10,
-                 max_rad_len=100, termination=True,
+    def __init__(self, max_rad_len=100, termination=True,
+                 step_time=1e1, completion_time=1e5, min_steps=100,
                  k_prop=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
                  observation_mode='all', action_mode='single',
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
@@ -99,65 +98,31 @@ class ATRPEnv(gym.Env):
                  reward_mode='chain length', reward_chain_type='dorm',
                  cl_range=(20, 30), cl_unit=0.01,
                  dn_dist=None):
-        rate_constant = {K_POLY: k_prop, K_ACT: k_act, K_DEACT: k_deact}
-        rate_constant[K_TER] = k_ter if termination else 0.0
-        self.rate_constant = rate_constant
+        # setup the simulation system
+        # fundamental properties of the polymerization process
         self.max_rad_len = max_rad_len
         self.termination = termination
 
-        # variable indices (slices) for the ODE solver
-        index = {MONO: 0, CU1: 1, CU2: 2, DORM1: 3}
-        dorm_from = 3
-        index[DORM] = slice(dorm_from, dorm_from + max_rad_len)
-        rad_from = 3 + max_rad_len
-        index[RAD] = slice(rad_from, rad_from + max_rad_len)
+        # step related
+        self.step_time = step_time
+        self.completion_time = completion_time
+        self.min_steps = min_steps
 
-        if termination:
-            # slices for the 2 types of terminated chains (ter)
-            # ter type 1: length 2 to n
-            ter1_from = 3 + 2 * max_rad_len
-            index[TER_A] = slice(ter1_from, ter1_from + max_rad_len - 1)
+        # rate constants
+        rate_constant = {K_POLY: k_prop, K_ACT: k_act, K_DEACT: k_deact}
+        rate_constant[K_TER] = k_ter if termination else 0.0
+        self.rate_constant = rate_constant
 
-            # ter type 2: length n+1 to 2n
-            ter2_from = 2 + 3 * max_rad_len
-            index[TER_B] = slice(ter2_from, ter2_from + max_rad_len)
+        # index (used in self.atrp and self.atrp_jac)
+        self.index = index = self.init_index()
 
-            # total number of terminated chains is 2n-1
-            index[TER] = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
-        self.index = index
-
-        # observation
-        quant_len = 2 + 4 * max_rad_len if termination else 3 + 2 * max_rad_len
-        max_chain_len = 2 * max_rad_len if self.termination else max_rad_len
-        self.rad_chain_lengths = np.arange(1, 1 + max_rad_len)
-        if termination:
-            self.ter_chain_lengths = np.arange(2, 1 + 2 * max_rad_len)
-        self.max_chain_len = max_chain_len
-        observation_mode = observation_mode.lower()
-        self.observation_mode = observation_mode
-        if observation_mode == 'all':
-            # 'capped' indicator of [MONO, CU1, CU2, DORM1, SOL],
-            # volume and self.quant
-            obs_len = 5 + 1 + quant_len
-        if observation_mode == 'all stable':
-            # 'capped' indicator of [MONO, CU1, CU2, DORM1, SOL],
-            # volume, summed quantity of all stable chains, Cu(I), and Cu(II)
-            obs_len = 5 + 1 + max_chain_len + 2
-        self.observation_space = spaces.Box(0, np.inf, shape=(obs_len,))
-
-        # build initial variable and timestep
+        # initial quant
+        self.observation_mode = observation_mode.lower()
         self.init_amount = {MONO: mono_init, CU1: cu1_init, CU2: cu2_init,
                             DORM1: dorm1_init, SOL: sol_init}
         self.density = {MONO: mono_density, SOL: sol_density}
         self.volume = mono_init / mono_density + sol_init / sol_density
-        quant_init = np.zeros(quant_len)
-        quant_init[index[MONO]] = mono_init
-        quant_init[index[CU1]] = cu1_init
-        quant_init[index[CU2]] = cu2_init
-        quant_init[index[DORM1]] = dorm1_init
-        self.quant_init = quant_init
-        self.step_time = np.array([0.0, timestep])
-        self.completion_time = np.arange(0.0, completion_time + EPS, timestep)
+        self.quant_init = self.init_quant()
 
         # actions
         action_mode = action_mode.lower()
@@ -184,7 +149,6 @@ class ATRPEnv(gym.Env):
         elif reward_chain_type == TER:
             chain_min = 2
         if self.reward_mode == 'chain length':
-            reward_chain_type = reward_chain_type.lower()
             self.cl_unit = cl_unit
             start, end = cl_range[0] - chain_min, cl_range[1] - chain_min
             self.cl_slice = slice(start, end)
@@ -200,7 +164,12 @@ class ATRPEnv(gym.Env):
         # rendering
         self.axes = None
 
+        # ode integrator
+        odeint = ode(self.atrp, self.atrp_jac)
+        self.odeint = odeint.set_integrator('vode', method='bdf', nsteps=5000)
+
     def _reset(self):
+        self.step_count = 0
         self.added = self.init_amount.copy()
         self.quant = self.quant_init
         if self.reward_mode == 'chain length':
@@ -209,6 +178,7 @@ class ATRPEnv(gym.Env):
         return self.observation()
 
     def _step(self, action):
+        self.step_count += 1
         if self.action_mode == 'single':
             action_list = [0] * self.action_space.n
             action_list[action] = 1
@@ -251,6 +221,60 @@ class ATRPEnv(gym.Env):
                 self.update_plot(STABLE, stable_chains)
         plt.draw()
         plt.pause(0.0001)
+
+    def init_index(self):
+        max_rad_len = self.max_rad_len
+
+        # variable indices (slices) for the ODE solver
+        index = {MONO: 0, CU1: 1, CU2: 2, DORM1: 3}
+        dorm_from = 3
+        index[DORM] = slice(dorm_from, dorm_from + max_rad_len)
+        rad_from = 3 + max_rad_len
+        index[RAD] = slice(rad_from, rad_from + max_rad_len)
+
+        if self.termination:
+            # slices for the 2 types of terminated chains (ter)
+            # ter type 1: length 2 to n
+            ter1_from = 3 + 2 * max_rad_len
+            index[TER_A] = slice(ter1_from, ter1_from + max_rad_len - 1)
+
+            # ter type 2: length n+1 to 2n
+            ter2_from = 2 + 3 * max_rad_len
+            index[TER_B] = slice(ter2_from, ter2_from + max_rad_len)
+
+            # total number of terminated chains is 2n-1
+            index[TER] = slice(ter1_from, ter1_from + 2 * max_rad_len - 1)
+        return index
+
+    def init_quant(self):
+        max_rad_len = self.max_rad_len
+        # observation
+        quant_len = 3 + 2 * max_rad_len
+        max_chain_len = max_rad_len
+        self.rad_chain_lengths = np.arange(1, 1 + max_rad_len)
+        if self.termination:
+            quant_len += 2 * max_rad_len - 1
+            max_chain_len += max_rad_len
+            self.ter_chain_lengths = np.arange(2, 1 + max_chain_len)
+        self.max_chain_len = max_chain_len
+        observation_mode = self.observation_mode
+        if observation_mode == 'all':
+            # 'capped' indicator of [MONO, CU1, CU2, DORM1, SOL],
+            # volume and self.quant
+            obs_len = 5 + 1 + quant_len
+        elif observation_mode == 'all stable':
+            # 'capped' indicator of [MONO, CU1, CU2, DORM1, SOL],
+            # volume, summed quantity of all stable chains, Cu(I), and Cu(II)
+            obs_len = 5 + 1 + max_chain_len + 2
+        self.observation_space = spaces.Box(0, np.inf, shape=(obs_len,))
+
+        # build initial variable
+        quant_init = np.zeros(quant_len)
+        index = self.index
+        init_amount = self.init_amount
+        for key in MONO, CU1, CU2, DORM1:
+            quant_init[index[key]] = init_amount[key]
+        return quant_init
 
     def take_action(self, action):
         self.add(action, MONO, change_volume=True)
@@ -297,7 +321,35 @@ class ATRPEnv(gym.Env):
         return stable_chains
 
     def done(self):
-        return all(self.capped(key) for key in [MONO, CU1, CU2, DORM1, SOL])
+        min_steps_exceeded = self.step_count >= self.min_steps
+        species = MONO, CU1, CU2, DORM1, SOL
+        all_capped = all(self.capped(key) for key in species)
+        return min_steps_exceeded and all_capped
+
+    def run_atrp(self, step_time):
+        # solve atrp odes to get new concentration
+        volume = self.volume
+        conc = self.quant / volume
+        odeint = self.odeint
+        odeint.set_initial_value(conc, 0.0)
+        conc = odeint.integrate(step_time)
+        quant = conc * volume
+
+        # adjust 'quant' so that the monomer amount is conserved
+        index = self.index
+        added = self.added
+        ref_quant_eq_mono = added[MONO] + added[DORM1]
+        mono = quant[index[MONO]]
+        dorm = quant[index[DORM]]
+        rad = quant[index[RAD]]
+        quant_eq_mono = mono + (dorm + rad).dot(self.rad_chain_lengths)
+        if self.termination:
+            quant_eq_mono += quant[index[TER]].dot(self.ter_chain_lengths)
+        ratio = ref_quant_eq_mono / quant_eq_mono if quant_eq_mono else 1.0
+        quant *= ratio
+        self.quant = quant
+        reward = self.reward()
+        return reward
 
     def reward(self):
         chain = self.chain(self.reward_chain_type)
@@ -323,32 +375,7 @@ class ATRPEnv(gym.Env):
         cap = self.add_cap[key]
         return cap is not None and added_eps > cap
 
-    def run_atrp(self, step_time):
-        # solve atrp odes to get new concentration
-        volume = self.volume
-        conc = self.quant / volume
-        conc = odeint(self.atrp, conc, step_time, Dfun=self.atrp_jac)[1:]
-        quant = conc * volume
-
-        # adjust 'quant' so that the monomer amount is conserved
-        index = self.index
-        added = self.added
-        ref_quant_eq_mono = added[MONO] + added[DORM1]
-        reward = 0.0
-        for qt in quant:
-            mono = qt[index[MONO]]
-            dorm = qt[index[DORM]]
-            rad = qt[index[RAD]]
-            quant_eq_mono = mono + (dorm + rad).dot(self.rad_chain_lengths)
-            if self.termination:
-                quant_eq_mono += qt[index[TER]].dot(self.ter_chain_lengths)
-            ratio = ref_quant_eq_mono / quant_eq_mono if quant_eq_mono else 1.0
-            qt *= ratio
-            self.quant = qt
-            reward += self.reward()
-        return reward
-
-    def atrp(self, var, time):
+    def atrp(self, time, var):
         max_rad_len = self.max_rad_len
 
         rate_constant = self.rate_constant
@@ -415,7 +442,7 @@ class ATRPEnv(gym.Env):
 
         return dvar
 
-    def atrp_jac(self, var, time):
+    def atrp_jac(self, time, var):
         max_rad_len = self.max_rad_len
 
         rate_constant = self.rate_constant
