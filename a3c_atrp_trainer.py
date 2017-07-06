@@ -12,7 +12,7 @@ def main():
         worker(args)
 
 
-ENV = 'ATRP'
+ENV = 'ATRP-polystyrene-v0'
 
 ''' arguments block '''
 import argparse
@@ -103,19 +103,12 @@ from hcdrl.common.policy import Stochastic
 from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.common.util import get_output_folder
 from hcdrl.simple_nets import simple_acnet
-from atrp import ATRPEnv
+import atrp_ps
 
 def worker(args):
 
     # environment
-    env = ATRPEnv(max_rad_len=70, timestep=1e1,
-                  termination=False, k_ter=1e8,
-                  observation_mode='all stable', action_mode='single',
-                  mono_init=2.0, cu1_init=0.0, cu2_init=0.0, dorm1_init=0.0,
-                  mono_unit=0.05, cu1_unit=0.02, cu2_unit=0.02, dorm1_unit=0.02,
-                  mono_cap=10.0, cu1_cap=0.2, cu2_cap=0.2, dorm1_cap=0.4,
-                  sol_init=0.0, sol_cap=0.0,
-                  cl_range=(15, 25))
+    env = gym.make(ENV)
     input_shape = env.observation_space.shape
     num_actions = env.action_space.n
 
