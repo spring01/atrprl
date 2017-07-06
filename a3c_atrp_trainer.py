@@ -58,6 +58,7 @@ def arguments():
 
     # parse arguments
     args = parser.parse_args()
+    args.net_arch = tuple(args.net_arch)
     return args
 
 
@@ -125,7 +126,6 @@ def worker(args):
     worker_dev = '/job:local/task:{}/cpu:0'.format(worker_index)
     rep_dev = tf.train.replica_device_setter(worker_device=worker_dev,
                                              cluster=cluster)
-
     net_args = input_shape, num_actions, args.net_arch
 
     # global net
