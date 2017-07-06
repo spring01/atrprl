@@ -3,8 +3,7 @@ ATRP deep RL evaluator
 Supports both DQN and A3C
 """
 
-import sys
-import time
+import os
 import gym
 import argparse
 import numpy as np
@@ -91,7 +90,6 @@ def main():
             state, reward, done, info = env.step(action)
             if render:
                 env.render()
-                time.sleep(0.01)
             total_rewards += reward
             if done:
                 break
@@ -101,4 +99,5 @@ def main():
 
 
 if __name__ == "__main__":
+    os.environ['OMP_NUM_THREADS'] = '1'
     main()
