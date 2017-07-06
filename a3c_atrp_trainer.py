@@ -58,7 +58,6 @@ def arguments():
 
     # parse arguments
     args = parser.parse_args()
-    args.net_arch = tuple(args.net_arch)
     return args
 
 
@@ -76,7 +75,7 @@ def trainer(args):
         run_list = ['python', __file__]
         for key, value in args_dict.items():
             run_list.append('--{}'.format(key))
-            if type(value) == tuple:
+            if type(value) == list:
                 for val in map(str, value):
                     run_list.append(val)
             else:
