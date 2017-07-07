@@ -71,7 +71,8 @@ import time
 import subprocess
 
 def trainer(args):
-    num_workers = int(args.dtf_num_workers)
+    print(args)
+    num_workers = args.dtf_num_workers
     args_dict = vars(args)
     args_dict['a3c_running_mode'] = 'worker'
     worker_list = []
