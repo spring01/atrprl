@@ -563,6 +563,9 @@ class ATRPEnv(gym.Env):
     def update_plot(self, key, values=None):
         if values is None:
             values = self.quant[self.index[key]]
-        self.axes[key].set_ylim([0, np.max(values) + EPS])
+        ymax = np.max(values) * 1.1
+        if not ymax:
+            ymax = EPS
+        self.axes[key].set_ylim([0, ymax])
         self.plots[key].set_ydata(values)
 
