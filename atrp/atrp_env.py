@@ -94,7 +94,8 @@ class ATRPEnv(gym.Env):
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=0.0,
-                 reward_mode='chain length', reward_chain_type='dorm',
+                 reward_mode='chain length',
+                 reward_chain_type='dorm', reward_endonly=False,
                  cl_range=(20, 30), cl_unit=0.01,
                  dn_dist=None):
         # setup the simulation system
@@ -155,9 +156,11 @@ class ATRPEnv(gym.Env):
             if dn_dist is None:
                 chain_slice = index[reward_chain_type]
                 dn_dist = np.ones(chain_slice.stop - chain_slice.start)
+            dn_dist = np.array(dn_dist)
             dn_num_mono = np.arange(chain_min, chain_min + len(dn_dist))
             dn_mono_quant = dn_dist.dot(dn_num_mono)
             self.dn_target_quant = dn_dist / dn_mono_quant * mono_cap
+        self.reward_endonly = reward_endonly
 
         # rendering
         self.axes = None
@@ -189,6 +192,8 @@ class ATRPEnv(gym.Env):
             reward = self.run_atrp(self.completion_time)
         else:
             reward = self.run_atrp(self.step_time)
+        if self.reward_endonly and not done:
+            reward = 0.0
         observation = self.observation()
         return observation, reward, done, info
 
