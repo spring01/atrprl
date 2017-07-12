@@ -251,7 +251,7 @@ register(
     max_episode_steps=100000,
     kwargs={
         'max_rad_len': 200,
-        'step_time': 1e2,
+        'step_time': 3e2,
         'completion_time': 1e5,
         'min_steps': 100,
         'termination': False,
