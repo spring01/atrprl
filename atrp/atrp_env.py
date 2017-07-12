@@ -1,9 +1,8 @@
 
-import gym
-from gym import spaces
+import gym, gym.spaces
 import numpy as np
-from scipy.integrate import ode
 import matplotlib.pyplot as plt
+from scipy.integrate import ode
 
 
 __all__ = ['ATRPEnv']
@@ -127,10 +126,10 @@ class ATRPEnv(gym.Env):
         action_mode = action_mode.lower()
         self.action_mode = action_mode
         if action_mode == 'multi':
-            action_tuple = tuple(spaces.Discrete(2) for _ in range(5))
-            action_space = spaces.Tuple(action_tuple)
+            action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
+            action_space = gym.spaces.Tuple(action_tuple)
         elif action_mode == 'single':
-            action_space = spaces.Discrete(5)
+            action_space = gym.spaces.Discrete(5)
         self.action_space = action_space
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
@@ -266,7 +265,7 @@ class ATRPEnv(gym.Env):
             # 'capped' indicator of [MONO, CU1, CU2, DORM1, SOL],
             # volume, summed quantity of all stable chains, Cu(I), and Cu(II)
             obs_len = 5 + 1 + max_chain_len + 2
-        self.observation_space = spaces.Box(0, np.inf, shape=(obs_len,))
+        self.observation_space = gym.spaces.Box(0, np.inf, shape=(obs_len,))
 
         # build initial variable
         quant_init = np.zeros(quant_len)
