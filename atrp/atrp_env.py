@@ -143,6 +143,7 @@ class ATRPEnv(gym.Env):
         self.reward_mode = reward_mode.lower()
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
+        self.target_ymax = 0.0
         if reward_chain_type == DORM or reward_chain_type == STABLE:
             chain_min = 1
         elif reward_chain_type == TER:
@@ -160,6 +161,7 @@ class ATRPEnv(gym.Env):
             dn_num_mono = np.arange(chain_min, chain_min + len(dn_dist))
             dn_mono_quant = dn_dist.dot(dn_num_mono)
             self.dn_target_quant = dn_dist / dn_mono_quant * mono_cap
+            self.target_ymax = np.max(self.dn_target_quant) * 1.1
         self.reward_endonly = reward_endonly
 
         # rendering
@@ -567,7 +569,7 @@ class ATRPEnv(gym.Env):
     def update_plot(self, key, values=None):
         if values is None:
             values = self.quant[self.index[key]]
-        ymax = np.max(values) * 1.1
+        ymax = max(np.max(values) * 1.1, self.target_ymax)
         if not ymax:
             ymax = EPS
         self.axes[key].set_ylim([0, ymax])
