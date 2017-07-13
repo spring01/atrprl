@@ -569,7 +569,9 @@ class ATRPEnv(gym.Env):
     def update_plot(self, key, values=None):
         if values is None:
             values = self.quant[self.index[key]]
-        ymax = max(np.max(values) * 1.1, self.target_ymax)
+        ymax = np.max(values) * 1.1
+        if key == self.reward_chain_type:
+            ymax = max(ymax, self.target_ymax)
         if not ymax:
             ymax = EPS
         self.axes[key].set_ylim([0, ymax])
