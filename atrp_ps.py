@@ -3,6 +3,7 @@ from atrp import ATRPEnv
 from gym.envs.registration import register
 
 
+# v0: chain length reward, reference simulation
 register(
     id='ATRP-polystyrene-v0',
     entry_point='atrp:ATRPEnv',
@@ -38,6 +39,7 @@ register(
     }
 )
 
+# v1: chain length reward, adding all but mono, 10s timestep
 register(
     id='ATRP-polystyrene-v1',
     entry_point='atrp:ATRPEnv',
@@ -54,7 +56,7 @@ register(
         'k_ter': 1e8,
         'observation_mode': 'all',
         'action_mode': 'single',
-        'mono_init': 0.0,
+        'mono_init': 10.0,
         'cu1_init': 0.0,
         'cu2_init': 0.0,
         'dorm1_init': 0.0,
@@ -69,16 +71,17 @@ register(
         'mono_density': 8.73,
         'sol_init': 0.01,
         'sol_cap': 0.0,
-        'cl_range': (20, 25),
+        'cl_range': (23, 28),
     }
 )
 
+# v2: chain length reward, adding all but mono, 100s timestep
 register(
     id='ATRP-polystyrene-v2',
     entry_point='atrp:ATRPEnv',
     max_episode_steps=100000,
     kwargs={
-        'max_rad_len': 70,
+        'max_rad_len': 150,
         'step_time': 1e3,
         'completion_time': 1e5,
         'min_steps': 100,
@@ -88,76 +91,6 @@ register(
         'k_deact': 1.1e7,
         'k_ter': 1e8,
         'observation_mode': 'all',
-        'action_mode': 'single',
-        'mono_init': 0.0,
-        'cu1_init': 0.0,
-        'cu2_init': 0.0,
-        'dorm1_init': 0.0,
-        'mono_unit': 0.1,
-        'cu1_unit': 0.004,
-        'cu2_unit': 0.004,
-        'dorm1_unit': 0.008,
-        'mono_cap': 10.0,
-        'cu1_cap': 0.2,
-        'cu2_cap': 0.2,
-        'dorm1_cap': 0.4,
-        'mono_density': 8.73,
-        'sol_init': 0.01,
-        'sol_cap': 0.0,
-        'cl_range': (20, 25),
-    }
-)
-
-register(
-    id='ATRP-polystyrene-v3',
-    entry_point='atrp:ATRPEnv',
-    max_episode_steps=100000,
-    kwargs={
-        'max_rad_len': 70,
-        'step_time': 1e3,
-        'completion_time': 1e5,
-        'min_steps': 100,
-        'termination': False,
-        'k_prop': 1.6e3,
-        'k_act': 0.45,
-        'k_deact': 1.1e7,
-        'k_ter': 1e8,
-        'observation_mode': 'all stable',
-        'action_mode': 'single',
-        'mono_init': 0.0,
-        'cu1_init': 0.0,
-        'cu2_init': 0.0,
-        'dorm1_init': 0.0,
-        'mono_unit': 0.1,
-        'cu1_unit': 0.004,
-        'cu2_unit': 0.004,
-        'dorm1_unit': 0.008,
-        'mono_cap': 10.0,
-        'cu1_cap': 0.2,
-        'cu2_cap': 0.2,
-        'dorm1_cap': 0.4,
-        'mono_density': 8.73,
-        'sol_init': 0.01,
-        'sol_cap': 0.0,
-        'cl_range': (20, 25),
-    }
-)
-
-register(
-    id='ATRP-polystyrene-v4',
-    entry_point='atrp:ATRPEnv',
-    max_episode_steps=100000,
-    kwargs={
-        'max_rad_len': 200,
-        'step_time': 1e3,
-        'completion_time': 1e5,
-        'min_steps': 100,
-        'termination': False,
-        'k_prop': 1.6e3,
-        'k_act': 0.45,
-        'k_deact': 1.1e7,
-        'k_ter': 1e8,
-        'observation_mode': 'all stable',
         'action_mode': 'single',
         'mono_init': 10.0,
         'cu1_init': 0.0,
@@ -174,7 +107,79 @@ register(
         'mono_density': 8.73,
         'sol_init': 0.01,
         'sol_cap': 0.0,
-        'cl_range': (20, 25),
+        'cl_range': (23, 28),
+    }
+)
+
+# v3: chain length reward, adding all (including mono), 10s timestep
+register(
+    id='ATRP-polystyrene-v3',
+    entry_point='atrp:ATRPEnv',
+    max_episode_steps=100000,
+    kwargs={
+        'max_rad_len': 70,
+        'step_time': 1e1,
+        'completion_time': 1e5,
+        'min_steps': 100,
+        'termination': False,
+        'k_prop': 1.6e3,
+        'k_act': 0.45,
+        'k_deact': 1.1e7,
+        'k_ter': 1e8,
+        'observation_mode': 'all stable',
+        'action_mode': 'single',
+        'mono_init': 0.0,
+        'cu1_init': 0.0,
+        'cu2_init': 0.0,
+        'dorm1_init': 0.0,
+        'mono_unit': 0.1,
+        'cu1_unit': 0.004,
+        'cu2_unit': 0.004,
+        'dorm1_unit': 0.008,
+        'mono_cap': 10.0,
+        'cu1_cap': 0.2,
+        'cu2_cap': 0.2,
+        'dorm1_cap': 0.4,
+        'mono_density': 8.73,
+        'sol_init': 0.01,
+        'sol_cap': 0.0,
+        'cl_range': (23, 28),
+    }
+)
+
+# v4: chain length reward, adding all (including mono), 100s timestep
+register(
+    id='ATRP-polystyrene-v4',
+    entry_point='atrp:ATRPEnv',
+    max_episode_steps=100000,
+    kwargs={
+        'max_rad_len': 200,
+        'step_time': 1e2,
+        'completion_time': 1e5,
+        'min_steps': 100,
+        'termination': False,
+        'k_prop': 1.6e3,
+        'k_act': 0.45,
+        'k_deact': 1.1e7,
+        'k_ter': 1e8,
+        'observation_mode': 'all stable',
+        'action_mode': 'single',
+        'mono_init': 0.0,
+        'cu1_init': 0.0,
+        'cu2_init': 0.0,
+        'dorm1_init': 0.0,
+        'mono_unit': 0.1,
+        'cu1_unit': 0.004,
+        'cu2_unit': 0.004,
+        'dorm1_unit': 0.008,
+        'mono_cap': 10.0,
+        'cu1_cap': 0.2,
+        'cu2_cap': 0.2,
+        'dorm1_cap': 0.4,
+        'mono_density': 8.73,
+        'sol_init': 0.01,
+        'sol_cap': 0.0,
+        'cl_range': (23, 28),
     }
 )
 
@@ -245,13 +250,15 @@ dist_v0 = [7.67083938e-011,   1.70957420e-009,   1.90568059e-008,
            1.13328948e-104,   1.49821510e-105,   1.97357248e-106,
            2.59056035e-107,   3.38853551e-108,   4.41696414e-109,
            5.73779270e-110,   7.42831748e-111]
+
+# v5: end-only distribution reward, adding all but mono, 10s timestep
 register(
     id='ATRP-polystyrene-v5',
     entry_point='atrp:ATRPEnv',
     max_episode_steps=100000,
     kwargs={
         'max_rad_len': 200,
-        'step_time': 3e2,
+        'step_time': 1e1,
         'completion_time': 1e5,
         'min_steps': 100,
         'termination': False,
@@ -262,6 +269,120 @@ register(
         'observation_mode': 'all stable',
         'action_mode': 'single',
         'mono_init': 10.0,
+        'cu1_init': 0.0,
+        'cu2_init': 0.0,
+        'dorm1_init': 0.0,
+        'mono_unit': 0.1,
+        'cu1_unit': 0.004,
+        'cu2_unit': 0.004,
+        'dorm1_unit': 0.008,
+        'mono_cap': 10.0,
+        'cu1_cap': 0.2,
+        'cu2_cap': 0.2,
+        'dorm1_cap': 0.4,
+        'mono_density': 8.73,
+        'sol_init': 0.01,
+        'sol_cap': 0.0,
+        'reward_mode': 'distribution',
+        'reward_endonly': True,
+        'dn_dist': dist_v0,
+    }
+)
+
+# v6: end-only distribution reward, adding all but mono, 100s timestep
+register(
+    id='ATRP-polystyrene-v6',
+    entry_point='atrp:ATRPEnv',
+    max_episode_steps=100000,
+    kwargs={
+        'max_rad_len': 200,
+        'step_time': 1e2,
+        'completion_time': 1e5,
+        'min_steps': 100,
+        'termination': False,
+        'k_prop': 1.6e3,
+        'k_act': 0.45,
+        'k_deact': 1.1e7,
+        'k_ter': 1e8,
+        'observation_mode': 'all stable',
+        'action_mode': 'single',
+        'mono_init': 10.0,
+        'cu1_init': 0.0,
+        'cu2_init': 0.0,
+        'dorm1_init': 0.0,
+        'mono_unit': 0.1,
+        'cu1_unit': 0.004,
+        'cu2_unit': 0.004,
+        'dorm1_unit': 0.008,
+        'mono_cap': 10.0,
+        'cu1_cap': 0.2,
+        'cu2_cap': 0.2,
+        'dorm1_cap': 0.4,
+        'mono_density': 8.73,
+        'sol_init': 0.01,
+        'sol_cap': 0.0,
+        'reward_mode': 'distribution',
+        'reward_endonly': True,
+        'dn_dist': dist_v0,
+    }
+)
+
+# v7: end-only distribution reward, adding all (including mono), 10s timestep
+register(
+    id='ATRP-polystyrene-v7',
+    entry_point='atrp:ATRPEnv',
+    max_episode_steps=100000,
+    kwargs={
+        'max_rad_len': 200,
+        'step_time': 1e1,
+        'completion_time': 1e5,
+        'min_steps': 100,
+        'termination': False,
+        'k_prop': 1.6e3,
+        'k_act': 0.45,
+        'k_deact': 1.1e7,
+        'k_ter': 1e8,
+        'observation_mode': 'all stable',
+        'action_mode': 'single',
+        'mono_init': 0.0,
+        'cu1_init': 0.0,
+        'cu2_init': 0.0,
+        'dorm1_init': 0.0,
+        'mono_unit': 0.1,
+        'cu1_unit': 0.004,
+        'cu2_unit': 0.004,
+        'dorm1_unit': 0.008,
+        'mono_cap': 10.0,
+        'cu1_cap': 0.2,
+        'cu2_cap': 0.2,
+        'dorm1_cap': 0.4,
+        'mono_density': 8.73,
+        'sol_init': 0.01,
+        'sol_cap': 0.0,
+        'reward_mode': 'distribution',
+        'reward_endonly': True,
+        'dn_dist': dist_v0,
+    }
+)
+
+# v8: end-only distribution reward, adding all (including mono), 100s timestep
+register(
+    id='ATRP-polystyrene-v8',
+    entry_point='atrp:ATRPEnv',
+    max_episode_steps=100000,
+    kwargs={
+        'max_rad_len': 200,
+        'step_time': 1e2,
+        'completion_time': 1e5,
+        'min_steps': 100,
+        'termination': False,
+        'k_prop': 1.6e3,
+        'k_act': 0.45,
+        'k_deact': 1.1e7,
+        'k_ter': 1e8,
+        'observation_mode': 'all stable',
+        'action_mode': 'single',
+        'mono_init': 0.0,
         'cu1_init': 0.0,
         'cu2_init': 0.0,
         'dorm1_init': 0.0,
