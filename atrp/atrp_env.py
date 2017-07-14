@@ -2,7 +2,9 @@
 import gym, gym.spaces
 import numpy as np
 import matplotlib.pyplot as plt
+import pyemd
 from scipy.integrate import ode
+from scipy.spatial.distance import pdist, squareform
 
 
 __all__ = ['ATRPEnv']
@@ -72,6 +74,8 @@ class ATRPEnv(gym.Env):
             'chain length' (cl): +1 reward once a unit amount of monomer
                                  is converted to chain lengths in this range;
             'distribution' (dn): rewards are based on distribution differences.
+        reward_scale:      scale reward by this factor;
+        reward_shift:      shift *scaled* reward by this value;
         reward_chain_type: type of chain that the reward is related with.
     'chain length' mode:
         cl_range: range of desired chain lengths
@@ -79,7 +83,8 @@ class ATRPEnv(gym.Env):
         cl_unit:  unit of change in equivalent amount of monomer
                   considered as rewarding.
     'distribution' mode:
-        dn_dist:  desired distribution (of the rewarding chain type).
+        dn_distribution:  desired distribution (of the rewarding chain type).
+        dn_distance_type: distance type (wrt. target); 'l2' or 'emd'
 
     '''
 
@@ -94,10 +99,10 @@ class ATRPEnv(gym.Env):
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=0.0,
-                 reward_mode='chain length',
+                 reward_mode='chain length', reward_scale=1.0, reward_shift=0.0,
                  reward_chain_type='dorm', reward_endonly=False,
                  cl_range=(20, 30), cl_unit=0.01,
-                 dn_dist=None):
+                 dn_distribution=None, dn_distance_type='l2'):
         # setup the simulation system
         # fundamental properties of the polymerization process
         self.max_rad_len = max_rad_len
@@ -141,6 +146,8 @@ class ATRPEnv(gym.Env):
 
         # rewards
         self.reward_mode = reward_mode.lower()
+        self.reward_scale = reward_scale
+        self.reward_shift = reward_shift
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
         self.target_ymax = 0.0
@@ -154,14 +161,16 @@ class ATRPEnv(gym.Env):
             self.cl_slice = slice(start, end)
             self.cl_num_mono = np.arange(*cl_range)
         elif self.reward_mode == 'distribution':
-            if dn_dist is None:
+            if dn_distribution is None:
                 chain_slice = index[reward_chain_type]
-                dn_dist = np.ones(chain_slice.stop - chain_slice.start)
-            dn_dist = np.array(dn_dist)
-            dn_num_mono = np.arange(chain_min, chain_min + len(dn_dist))
-            dn_mono_quant = dn_dist.dot(dn_num_mono)
-            self.dn_target_quant = dn_dist / dn_mono_quant * mono_cap
+                dn_distribution = np.ones(chain_slice.stop - chain_slice.start)
+            dn_distribution = np.array(dn_distribution)
+            dn_num_mono = np.arange(chain_min, chain_min + len(dn_distribution))
+            dn_mono_quant = dn_distribution.dot(dn_num_mono)
+            self.dn_num_mono = dn_num_mono
+            self.dn_target_quant = dn_distribution / dn_mono_quant * mono_cap
             self.target_ymax = np.max(self.dn_target_quant) * 1.1
+            self.dn_distance_type = dn_distance_type.lower()
         self.reward_endonly = reward_endonly
 
         # rendering
@@ -353,8 +362,7 @@ class ATRPEnv(gym.Env):
         ratio = ref_quant_eq_mono / quant_eq_mono if quant_eq_mono else 1.0
         quant *= ratio
         self.quant = quant
-        reward = self.reward()
-        return reward
+        return self.reward()
 
     def reward(self):
         chain = self.chain(self.reward_chain_type)
@@ -362,10 +370,18 @@ class ATRPEnv(gym.Env):
             reward_chain = chain[self.cl_slice]
             diff_reward_chain = reward_chain - self.last_reward_chain
             self.last_reward_chain = reward_chain
-            return diff_reward_chain.dot(self.cl_num_mono)
+            reward = diff_reward_chain.dot(self.cl_num_mono)
         elif self.reward_mode == 'distribution':
-            diff = chain - self.dn_target_quant
-            return -diff.dot(diff)
+            dn_target_quant = self.dn_target_quant
+            if self.dn_distance_type == 'l2':
+                diff = chain - dn_target_quant
+                reward = -diff.dot(diff)
+            elif self.dn_distance_type == 'emd':
+                dtn = chain / np.sum(chain)
+                dtn_ref = dn_target_quant / np.sum(dn_target_quant)
+                dist_mat = squareform(pdist(np.array([self.dn_num_mono]).T))
+                reward = pyemd.emd(dtn, dtn_ref, dist_mat)
+        return reward * self.reward_scale + self.reward_shift
 
     def chain(self, key):
         if key in [RAD, DORM, TER]:
