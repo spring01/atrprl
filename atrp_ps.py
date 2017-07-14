@@ -153,7 +153,7 @@ register(
     entry_point='atrp:ATRPEnv',
     max_episode_steps=100000,
     kwargs={
-        'max_rad_len': 200,
+        'max_rad_len': 70,
         'step_time': 1e2,
         'completion_time': 1e5,
         'min_steps': 100,
@@ -257,7 +257,7 @@ register(
     entry_point='atrp:ATRPEnv',
     max_episode_steps=100000,
     kwargs={
-        'max_rad_len': 200,
+        'max_rad_len': 70,
         'step_time': 1e1,
         'completion_time': 1e5,
         'min_steps': 100,
@@ -285,7 +285,7 @@ register(
         'sol_cap': 0.0,
         'reward_mode': 'distribution',
         'reward_endonly': True,
-        'dn_dist': dist_v0,
+        'dn_dist': dist_v0[:70],
     }
 )
 
@@ -295,7 +295,7 @@ register(
     entry_point='atrp:ATRPEnv',
     max_episode_steps=100000,
     kwargs={
-        'max_rad_len': 200,
+        'max_rad_len': 70,
         'step_time': 1e2,
         'completion_time': 1e5,
         'min_steps': 100,
@@ -323,7 +323,7 @@ register(
         'sol_cap': 0.0,
         'reward_mode': 'distribution',
         'reward_endonly': True,
-        'dn_dist': dist_v0,
+        'dn_dist': dist_v0[:70],
     }
 )
 
@@ -333,7 +333,7 @@ register(
     entry_point='atrp:ATRPEnv',
     max_episode_steps=100000,
     kwargs={
-        'max_rad_len': 200,
+        'max_rad_len': 70,
         'step_time': 1e1,
         'completion_time': 1e5,
         'min_steps': 100,
@@ -361,7 +361,7 @@ register(
         'sol_cap': 0.0,
         'reward_mode': 'distribution',
         'reward_endonly': True,
-        'dn_dist': dist_v0,
+        'dn_dist': dist_v0[:70],
     }
 )
 
@@ -371,7 +371,7 @@ register(
     entry_point='atrp:ATRPEnv',
     max_episode_steps=100000,
     kwargs={
-        'max_rad_len': 200,
+        'max_rad_len': 70,
         'step_time': 1e2,
         'completion_time': 1e5,
         'min_steps': 100,
@@ -399,7 +399,7 @@ register(
         'sol_cap': 0.0,
         'reward_mode': 'distribution',
         'reward_endonly': True,
-        'dn_dist': dist_v0,
+        'dn_dist': dist_v0[:70],
     }
 )
 
