@@ -16,11 +16,14 @@ from hcdrl.simple_nets import simple_acnet, simple_qnet
 import atrp_ps
 
 
-ENV = 'ATRP-polystyrene-v0'
 episode_maxlen = 100000
 
 def main():
     parser = argparse.ArgumentParser(description='Deep RL ATRP')
+
+    # environment name
+    parser.add_argument('--env', default='ATRP-polystyrene-v0',
+        help='Environment name')
 
     # policy arguments
     parser.add_argument('--policy_type', default='stochastic', type=str,
@@ -56,7 +59,7 @@ def main():
     print('########## All arguments:', args)
 
     # environment
-    env = gym.make(ENV)
+    env = gym.make(args.env)
     input_shape = env.observation_space.shape
     num_actions = env.action_space.n
 
