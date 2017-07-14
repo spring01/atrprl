@@ -1,5 +1,6 @@
 numpy
 scipy
+pyemd
 matplotlib
 gym
 tensorflow>=1.1
