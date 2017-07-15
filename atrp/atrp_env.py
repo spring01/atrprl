@@ -380,7 +380,7 @@ class ATRPEnv(gym.Env):
                 dtn = chain / np.sum(chain)
                 dtn_ref = dn_target_quant / np.sum(dn_target_quant)
                 dist_mat = squareform(pdist(np.array([self.dn_num_mono]).T))
-                reward = pyemd.emd(dtn, dtn_ref, dist_mat)
+                reward = -pyemd.emd(dtn, dtn_ref, dist_mat)
         return reward * self.reward_scale + self.reward_shift
 
     def chain(self, key):
