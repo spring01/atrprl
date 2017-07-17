@@ -74,8 +74,6 @@ class ATRPEnv(gym.Env):
             'chain length' (cl): +1 reward once a unit amount of monomer
                                  is converted to chain lengths in this range;
             'distribution' (dn): rewards are based on distribution differences.
-        reward_scale:      scale reward by this factor;
-        reward_shift:      shift *scaled* reward by this value;
         reward_chain_type: type of chain that the reward is related with.
     'chain length' mode:
         cl_range: range of desired chain lengths
@@ -93,14 +91,13 @@ class ATRPEnv(gym.Env):
     def __init__(self, max_rad_len=100, termination=True,
                  step_time=1e1, completion_time=1e5, min_steps=100,
                  k_prop=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
-                 observation_mode='all', action_mode='single',
+                 observation_mode='all',
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=0.0,
-                 reward_mode='chain length', reward_scale=1.0, reward_shift=0.0,
-                 reward_chain_type='dorm', reward_endonly=False,
+                 reward_mode='chain length', reward_chain_type=DORM,
                  cl_range=(20, 30), cl_unit=0.01,
                  dn_distribution=None, dn_distance_type='l2'):
         # setup the simulation system
@@ -129,13 +126,8 @@ class ATRPEnv(gym.Env):
         self.quant_init = self.init_quant()
 
         # actions
-        action_mode = action_mode.lower()
-        self.action_mode = action_mode
-        if action_mode == 'multi':
-            action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
-            action_space = gym.spaces.Tuple(action_tuple)
-        elif action_mode == 'single':
-            action_space = gym.spaces.Discrete(5)
+        action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
+        action_space = gym.spaces.Tuple(action_tuple)
         self.action_space = action_space
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
@@ -146,8 +138,6 @@ class ATRPEnv(gym.Env):
 
         # rewards
         self.reward_mode = reward_mode.lower()
-        self.reward_scale = reward_scale
-        self.reward_shift = reward_shift
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
         self.target_ymax = 0.0
@@ -171,7 +161,6 @@ class ATRPEnv(gym.Env):
             self.dn_target_quant = dn_distribution / dn_mono_quant * mono_cap
             self.target_ymax = np.max(self.dn_target_quant) * 1.1
             self.dn_distance_type = dn_distance_type.lower()
-        self.reward_endonly = reward_endonly
 
         # rendering
         self.axes = None
@@ -192,19 +181,12 @@ class ATRPEnv(gym.Env):
 
     def _step(self, action):
         self.step_count += 1
-        if self.action_mode == 'single':
-            action_list = [0] * self.action_space.n
-            action_list[action] = 1
-            action = tuple(action_list)
         self.take_action(action)
         done = self.done()
         info = {}
-        if done:
-            reward = self.run_atrp(self.completion_time)
-        else:
-            reward = self.run_atrp(self.step_time)
-        if self.reward_endonly and not done:
-            reward = 0.0
+        run_time = self.completion_time if done else self.step_time
+        self.run_atrp(run_time)
+        reward = self.reward(done)
         observation = self.observation()
         return observation, reward, done, info
 
@@ -362,16 +344,15 @@ class ATRPEnv(gym.Env):
         ratio = ref_quant_eq_mono / quant_eq_mono if quant_eq_mono else 1.0
         quant *= ratio
         self.quant = quant
-        return self.reward()
 
-    def reward(self):
+    def reward(self, done):
         chain = self.chain(self.reward_chain_type)
         if self.reward_mode == 'chain length':
             reward_chain = chain[self.cl_slice]
             diff_reward_chain = reward_chain - self.last_reward_chain
             self.last_reward_chain = reward_chain
             reward = diff_reward_chain.dot(self.cl_num_mono)
-        elif self.reward_mode == 'distribution':
+        elif self.reward_mode == 'distribution' and done:
             dn_target_quant = self.dn_target_quant
             if self.dn_distance_type == 'l2':
                 diff = chain - dn_target_quant
@@ -381,7 +362,9 @@ class ATRPEnv(gym.Env):
                 dtn_ref = dn_target_quant / np.sum(dn_target_quant)
                 dist_mat = squareform(pdist(np.array([self.dn_num_mono]).T))
                 reward = -pyemd.emd(dtn, dtn_ref, dist_mat)
-        return reward * self.reward_scale + self.reward_shift
+        else:
+            reward = 0.0
+        return reward
 
     def chain(self, key):
         if key in [RAD, DORM, TER]:
@@ -572,11 +555,10 @@ class ATRPEnv(gym.Env):
         num_plots = 4 if self.termination else 2
         axis = plt.subplot(num_plots, 1, num)
         plot = axis.plot(linspace, values, label=label)[0]
-        if self.reward_mode == 'distribution':
-            if key == self.reward_chain_type:
-                target_quant = self.dn_target_quant
-                target_label = 'Target distribution'
-                axis.plot(linspace, target_quant, 'r', label=target_label)
+        if self.reward_mode == 'distribution' and key == self.reward_chain_type:
+            target_quant = self.dn_target_quant
+            target_label = 'Target distribution'
+            axis.plot(linspace, target_quant, 'r', label=target_label)
         axis.legend()
         axis.set_xlim([0, self.max_chain_len])
         self.axes[key] = axis
