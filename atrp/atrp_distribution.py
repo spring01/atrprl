@@ -1,42 +1,39 @@
 
 import numpy as np
-import pyemd
-from scipy.spatial.distance import pdist, squareform
 from .atrp_base import ATRPBase, MONO, MARGIN_SCALE
 
 
+KS_NUM = 1e5
+KS_SCALE = 1.36 # corresponding value for alpha = 0.05
 '''
 Reward based on difference between the ending/target distributions:
     reward_chain_type: type of chain that the reward is related with.
     dn_distribution:  desired distribution (of the rewarding chain type).
-    dn_distance_type: distance type (wrt. target); 'l2' or 'emd'
 '''
 class ATRPDistribution(ATRPBase):
 
-    def init_reward(self, reward_chain_type, dn_distribution, dn_distance_type):
+    def init_reward(self, reward_chain_type, dn_distribution):
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
-        dn_distribution = np.array(dn_distribution)
+        self.dn_distribution = dn_distribution = np.array(dn_distribution)
         dn_num_mono = np.arange(1, 1 + len(dn_distribution))
         dn_mono_quant = dn_distribution.dot(dn_num_mono)
         self.dn_num_mono = dn_num_mono
         mono_cap = self.add_cap[MONO]
         self.dn_target_quant = dn_distribution / dn_mono_quant * mono_cap
         self.target_ymax = np.max(self.dn_target_quant) * MARGIN_SCALE
-        self.dn_distance_type = dn_distance_type.lower()
 
     def reward(self, done):
         if done:
             chain = self.chain(self.reward_chain_type)
-            dn_target_quant = self.dn_target_quant
-            if self.dn_distance_type == 'l2':
-                diff = chain - dn_target_quant
-                distance = diff.dot(diff)
-            elif self.dn_distance_type == 'emd':
-                dtn = chain / np.sum(chain)
-                dtn_ref = dn_target_quant / np.sum(dn_target_quant)
-                dist_mat = squareform(pdist(np.array([self.dn_num_mono]).T))
-                distance = pyemd.emd(dtn, dtn_ref, dist_mat)
+            dn_distribution = self.dn_distribution
+            target = dn_distribution / np.sum(dn_distribution)
+            cdf_target = np.cumsum(target)
+            current = chain / np.sum(chain)
+            cdf_current = np.cumsum(current)
+            ks_stat = np.max(np.abs(cdf_target - cdf_current))
+            ks_test = ks_stat < KS_SCALE * np.sqrt(2 / KS_NUM)
+            reward = float(ks_test)
         else:
             reward = 0.0
         return reward
