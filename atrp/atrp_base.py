@@ -109,9 +109,6 @@ class ATRPBase(gym.Env):
         self.quant_init = self.init_quant()
 
         # actions
-        action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
-        action_space = gym.spaces.Tuple(action_tuple)
-        self.action_space = action_space
         self.action_pos = 0.0, 0.2, 0.4, 0.6, 0.8
         self.action_num = MONO, CU1, CU2, DORM1, SOL
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
@@ -120,8 +117,10 @@ class ATRPBase(gym.Env):
                         DORM1: dorm1_cap, SOL: sol_cap}
         self.volume_unit = {MONO: mono_unit / mono_density,
                             SOL: sol_unit / sol_density}
+        self._init_action(**kwargs)
 
-        self.init_reward(**kwargs)
+        # initialize rewarding scheme (mostly in derived classes)
+        self._init_reward(**kwargs)
 
         # rendering
         self.axes = None
@@ -140,13 +139,14 @@ class ATRPBase(gym.Env):
 
     def _step(self, action):
         self.step_count += 1
+        action = self._parse_action(action)
         self.last_action = action
         self.take_action(action)
         done = self.done()
         info = {}
         run_time = self.completion_time if done else self.step_time
         self.run_atrp(run_time)
-        reward = self.reward(done)
+        reward = self._reward(done)
         observation = self.observation()
         return observation, reward, done, info
 
@@ -255,6 +255,13 @@ class ATRPBase(gym.Env):
         for key in MONO, CU1, CU2, DORM1:
             quant_init[index[key]] = init_amount[key]
         return quant_init
+
+    def _init_action(self, *args, **kwargs):
+        action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
+        self.action_space = gym.spaces.Tuple(action_tuple)
+
+    def _parse_action(self, action):
+        return action
 
     def take_action(self, action):
         self.add(action, MONO, change_volume=True)
@@ -512,7 +519,7 @@ class ATRPBase(gym.Env):
         axis = plt.subplot(num_plots, 1, num)
         linspace = np.linspace(1, len_values, len_values)
         plot = axis.plot(linspace, values, label=label)[0]
-        self.render_reward_init(key, axis)
+        self._render_reward_init(key, axis)
         axis.legend()
         axis.set_xlim([0, self.max_chain_len])
         self.axes[key] = axis
@@ -525,18 +532,18 @@ class ATRPBase(gym.Env):
             ymax = EPS
         axis = self.axes[key]
         axis.set_ylim([0, ymax])
-        self.render_reward_update(key, axis)
+        self._render_reward_update(key, axis)
         self.plots[key].set_ydata(values)
 
-    def init_reward(self, *args, **kwargs):
+    def _init_reward(self, *args, **kwargs):
         pass
 
-    def reward(self, *args, **kwargs):
+    def _reward(self, *args, **kwargs):
         return 0.0
 
-    def render_reward_init(self, *args, **kwargs):
+    def _render_reward_init(self, *args, **kwargs):
         pass
 
-    def render_reward_update(self, *args, **kwargs):
+    def _render_reward_update(self, *args, **kwargs):
         pass
 

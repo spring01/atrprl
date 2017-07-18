@@ -13,7 +13,7 @@ Reward based on difference between the ending/target distributions:
 '''
 class ATRPDistribution(ATRPBase):
 
-    def init_reward(self, reward_chain_type, dn_distribution):
+    def _init_reward(self, reward_chain_type, dn_distribution):
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
         self.dn_distribution = dn_distribution = np.array(dn_distribution)
@@ -24,7 +24,7 @@ class ATRPDistribution(ATRPBase):
         self.dn_target_quant = dn_distribution / dn_mono_quant * mono_cap
         self.target_ymax = np.max(self.dn_target_quant) * MARGIN_SCALE
 
-    def reward(self, done):
+    def _reward(self, done):
         if done:
             chain = self.chain(self.reward_chain_type)
             dn_distribution = self.dn_distribution
@@ -39,7 +39,7 @@ class ATRPDistribution(ATRPBase):
             reward = 0.0
         return reward
 
-    def render_reward_init(self, key, axis):
+    def _render_reward_init(self, key, axis):
         if key == self.reward_chain_type:
             target_quant = self.dn_target_quant
             target_label = 'Target distribution'
@@ -47,7 +47,7 @@ class ATRPDistribution(ATRPBase):
             linspace = np.linspace(1, len_values, len_values)
             axis.plot(linspace, target_quant, 'r', label=target_label)
 
-    def render_reward_update(self, key, axis):
+    def _render_reward_update(self, key, axis):
         if key == self.reward_chain_type:
             _, ymax = axis.get_ylim()
             if ymax < self.target_ymax:
