@@ -3,8 +3,9 @@ import numpy as np
 from .atrp_base import ATRPBase, MONO, MARGIN_SCALE
 
 
-KS_NUM = 1e5
-KS_SCALE = 1.36 # corresponding value for alpha = 0.05
+KS_NUM_SAMPLE = 1e5
+KS_FACTOR = 1.36 # corresponding value for alpha = 0.05
+
 '''
 Reward based on difference between the ending/target distributions:
     reward_chain_type: type of chain that the reward is related with.
@@ -32,7 +33,7 @@ class ATRPDistribution(ATRPBase):
             current = chain / np.sum(chain)
             cdf_current = np.cumsum(current)
             ks_stat = np.max(np.abs(cdf_target - cdf_current))
-            ks_test = ks_stat < KS_SCALE * np.sqrt(2 / KS_NUM)
+            ks_test = ks_stat < KS_FACTOR * np.sqrt(2.0 / KS_NUM_SAMPLE)
             reward = float(ks_test)
         else:
             reward = 0.0
