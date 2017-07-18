@@ -1,5 +1,6 @@
 
 import numpy as np
+import gym.spaces
 from .atrp_base import ATRPBase, MONO, MARGIN_SCALE
 
 
@@ -7,11 +8,27 @@ KS_NUM_SAMPLE = 1e5
 KS_FACTOR = 1.36 # corresponding value for alpha = 0.05
 
 '''
+Action space is Discrete(6):
+    0 --> (0, 0, 0, 0, 0)
+    1 --> (1, 0, 0, 0, 0)
+    2 --> (0, 1, 0, 0, 0)
+    3 --> (0, 0, 1, 0, 0)
+    4 --> (0, 0, 0, 1, 0)
+    5 --> (0, 0, 0, 0, 1)
 Reward based on difference between the ending/target distributions:
     reward_chain_type: type of chain that the reward is related with.
     dn_distribution:  desired distribution (of the rewarding chain type).
 '''
 class ATRPDistribution(ATRPBase):
+
+    def _init_action(self, **kwargs):
+        self.action_space = gym.spaces.Discrete(6)
+
+    def _parse_action(self, action):
+        parsed_action = [0] * 5
+        if action:
+            parsed_action[action - 1] = 1
+        return parsed_action
 
     def _init_reward(self, reward_chain_type, dn_distribution):
         reward_chain_type = reward_chain_type.lower()
