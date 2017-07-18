@@ -2,6 +2,7 @@
 import gym, gym.spaces
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import pyemd
 from scipy.integrate import ode
 from scipy.spatial.distance import pdist, squareform
@@ -128,6 +129,8 @@ class ATRPEnv(gym.Env):
         # actions
         action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
         action_space = gym.spaces.Tuple(action_tuple)
+        self.action_pos = 0.0, 0.2, 0.4, 0.6, 0.8
+        self.action_numbers = MONO, CU1, CU2, DORM1, SOL
         self.action_space = action_space
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
@@ -181,6 +184,7 @@ class ATRPEnv(gym.Env):
 
     def _step(self, action):
         self.step_count += 1
+        self.last_action = action
         self.take_action(action)
         done = self.done()
         info = {}
@@ -200,13 +204,26 @@ class ATRPEnv(gym.Env):
         if self.axes is None:
             self.axes = {}
             self.plots = {}
-            self.generate_plot(DORM)
+            num_plots = 5 if self.termination else 3
+            self.init_plot(DORM, 1, num_plots)
             plt.title('Quantities')
-            self.generate_plot(RAD)
+            self.init_plot(RAD, 2, num_plots)
             if self.termination:
-                self.generate_plot(TER)
+                self.init_plot(TER, 3, num_plots)
                 stable_chains = self.stable_chains()
-                self.generate_plot(STABLE, stable_chains)
+                self.init_plot(STABLE, 4, num_plots)
+            action_axis = plt.subplot(num_plots, 1, num_plots)
+            action_axis.get_xaxis().set_visible(False)
+            action_axis.get_yaxis().set_visible(False)
+            self.action_rect = {}
+            action_labels = 'Monomer', 'Cu(I)', 'Cu(II)', 'Initiator', 'Solvent'
+            for pos, label, anum in zip(self.action_pos, action_labels, self.action_numbers):
+                color = 'y' if self.capped(anum) else 'r'
+                rect = patches.Rectangle((pos, 0.0), 0.18, 1.0,
+                                         color=color, fill=True)
+                action_axis.add_patch(rect)
+                action_axis.annotate(label, (pos + 0.05, 0.4))
+                self.action_rect[pos] = rect
             plt.xlabel('Chain length')
             plt.tight_layout()
         else:
@@ -216,6 +233,13 @@ class ATRPEnv(gym.Env):
                 self.update_plot(TER)
                 stable_chains = self.stable_chains()
                 self.update_plot(STABLE, stable_chains)
+            for pos, act, anum in zip(self.action_pos, self.last_action, self.action_numbers):
+                rect = self.action_rect[pos]
+                if self.capped(anum):
+                    color = 'y'
+                else:
+                    color = 'g' if act else 'r'
+                rect.set_color(color)
         plt.draw()
         plt.pause(0.0001)
 
@@ -533,26 +557,21 @@ class ATRPEnv(gym.Env):
 
         return jac
 
-    def generate_plot(self, key, values=None):
+    def init_plot(self, key, num, num_plots):
         values = self.chain(key)
         len_values = len(values)
         if key == DORM:
             linspace = np.linspace(1, len_values, len_values)
-            num = 1
             label = 'Dormant chains'
         elif key == RAD:
             linspace = np.linspace(1, len_values, len_values)
-            num = 2
             label = 'Radical chains'
         elif key == TER:
             linspace = np.linspace(2, len_values + 1, len_values)
-            num = 3
             label = 'Terminated chains'
         elif key == STABLE:
             linspace = np.linspace(1, len_values, len_values)
-            num = 4
             label = 'All stable chains'
-        num_plots = 4 if self.termination else 2
         axis = plt.subplot(num_plots, 1, num)
         plot = axis.plot(linspace, values, label=label)[0]
         if self.reward_mode == 'distribution' and key == self.reward_chain_type:
