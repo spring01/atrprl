@@ -8,7 +8,7 @@ from scipy.integrate import ode
 from scipy.spatial.distance import pdist, squareform
 
 
-__all__ = ['ATRPEnv']
+__all__ = ['ATRPBase']
 
 ''' rate constants '''
 K_POLY  = 0
@@ -34,7 +34,7 @@ STABLE = 'dorm_ter'
 ''' epsilon for float comparison '''
 EPS = 1e-3
 
-class ATRPEnv(gym.Env):
+class ATRPBase(gym.Env):
 
     '''
     Length of `quant` is `4 * (max radical chain length) + 2`.

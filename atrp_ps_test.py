@@ -1,4 +1,4 @@
-from atrp import ATRPEnv
+from atrp import ATRPBase
 from gym.envs.registration import register
 
 
@@ -72,7 +72,7 @@ bimodal = [1.29640801e-010,   1.01264714e-009,   7.07814791e-009,
 
 register(
     id='ATRP-polystyrene-test-v0',
-    entry_point='atrp:ATRPEnv',
+    entry_point='atrp:ATRPBase',
     max_episode_steps=100000,
     kwargs={
         'max_rad_len': 100,
