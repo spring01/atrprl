@@ -115,8 +115,8 @@ class ATRPBase(gym.Env):
                          DORM1: dorm1_unit, SOL: sol_unit}
         self.add_cap = {MONO: mono_cap, CU1: cu1_cap, CU2: cu2_cap,
                         DORM1: dorm1_cap, SOL: sol_cap}
-        self.volume_unit = {MONO: mono_unit / mono_density,
-                            SOL: sol_unit / sol_density}
+        self.inverse_density = {MONO: 1. / mono_density, SOL: 1. / sol_density,
+                                CU1: 0.0, CU2: 0.0, DORM1: 0.0}
         self._init_action(**kwargs)
 
         # initialize rewarding scheme (mostly in derived classes)
@@ -264,24 +264,21 @@ class ATRPBase(gym.Env):
         return action
 
     def take_action(self, action):
-        self.add(action, MONO, change_volume=True)
+        self.add(action, MONO)
         self.add(action, CU1)
         self.add(action, CU2)
         self.add(action, DORM1)
-        self.add_sol(action)
+        self.add(action, SOL, change_quant=False)
 
-    def add(self, action, key, change_volume=False):
+    def add(self, action, key, change_quant=True):
         if action[key] and not self.capped(key):
             unit = self.add_unit[key]
-            self.quant[self.index[key]] += unit
-            if change_volume:
-                self.volume += self.volume_unit[key]
-            self.added[key] += unit
-
-    def add_sol(self, action):
-        if action[SOL] and not self.capped(SOL):
-            self.volume += self.volume_unit[SOL]
-            self.added[SOL] += self.add_unit[SOL]
+            amount = min(unit, self.add_cap[key] - self.added[key])
+            amount = max(amount, 0.0)
+            if change_quant:
+                self.quant[self.index[key]] += amount
+            self.volume += amount * self.inverse_density[key]
+            self.added[key] += amount
 
     def observation(self):
         capped = [self.capped(key) for key in (MONO, CU1, CU2, DORM1, SOL)]

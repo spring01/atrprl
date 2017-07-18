@@ -4,7 +4,7 @@ import gym.spaces
 from .atrp_base import ATRPBase, MONO, MARGIN_SCALE
 
 
-KS_NUM_SAMPLE = 1e5
+KS_NUM_SAMPLE = 5e3
 KS_FACTOR = 1.36 # corresponding value for alpha = 0.05
 
 '''
@@ -51,6 +51,7 @@ class ATRPDistribution(ATRPBase):
             cdf_current = np.cumsum(current)
             ks_stat = np.max(np.abs(cdf_target - cdf_current))
             ks_test = ks_stat < KS_FACTOR * np.sqrt(2.0 / KS_NUM_SAMPLE)
+            print(ks_stat, KS_FACTOR * np.sqrt(2.0 / KS_NUM_SAMPLE))
             reward = float(ks_test)
         else:
             reward = 0.0
