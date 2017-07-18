@@ -167,6 +167,10 @@ class ATRPEnv(gym.Env):
 
         # rendering
         self.axes = None
+        self.chain_label_dict = {DORM: 'Dormant chains',
+                                 RAD: 'Radical chains',
+                                 TER: 'Terminated chains',
+                                 STABLE: 'All stable chains'}
 
         # ode integrator
         odeint = ode(self.atrp, self.atrp_jac)
@@ -233,8 +237,7 @@ class ATRPEnv(gym.Env):
             self.update_plot(RAD)
             if self.termination:
                 self.update_plot(TER)
-                stable_chains = self.stable_chains()
-                self.update_plot(STABLE, stable_chains)
+                self.update_plot(STABLE)
             last_action = self.last_action
             if last_action is not None:
                 zip_iter = zip(self.action_pos, last_action, self.action_num)
@@ -396,8 +399,14 @@ class ATRPEnv(gym.Env):
         return reward
 
     def chain(self, key):
-        if key in [RAD, DORM, TER]:
-            chain = self.quant[self.index[key]]
+        quant = self.quant
+        index = self.index
+        if key in [RAD, DORM]:
+            chain = quant[index[key]]
+        elif key == TER:
+            mono = quant[index[MONO]]
+            ter = quant[index[TER]]
+            chain = np.concatenate([[mono], ter])
         elif key == STABLE:
             chain = self.stable_chains()
         return chain
@@ -565,19 +574,9 @@ class ATRPEnv(gym.Env):
     def init_plot(self, key, num, num_plots):
         values = self.chain(key)
         len_values = len(values)
-        if key == DORM:
-            linspace = np.linspace(1, len_values, len_values)
-            label = 'Dormant chains'
-        elif key == RAD:
-            linspace = np.linspace(1, len_values, len_values)
-            label = 'Radical chains'
-        elif key == TER:
-            linspace = np.linspace(2, len_values + 1, len_values)
-            label = 'Terminated chains'
-        elif key == STABLE:
-            linspace = np.linspace(1, len_values, len_values)
-            label = 'All stable chains'
+        label = self.chain_label_dict[key]
         axis = plt.subplot(num_plots, 1, num)
+        linspace = np.linspace(1, len_values, len_values)
         plot = axis.plot(linspace, values, label=label)[0]
         if self.reward_mode == 'distribution' and key == self.reward_chain_type:
             target_quant = self.dn_target_quant
@@ -588,9 +587,8 @@ class ATRPEnv(gym.Env):
         self.axes[key] = axis
         self.plots[key] = plot
 
-    def update_plot(self, key, values=None):
-        if values is None:
-            values = self.quant[self.index[key]]
+    def update_plot(self, key):
+        values = self.chain(key)
         ymax = np.max(values) * 1.1
         if key == self.reward_chain_type:
             ymax = max(ymax, self.target_ymax)
