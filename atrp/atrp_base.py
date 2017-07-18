@@ -3,12 +3,8 @@ import gym, gym.spaces
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import pyemd
 from scipy.integrate import ode
-from scipy.spatial.distance import pdist, squareform
 
-
-__all__ = ['ATRPBase']
 
 ''' rate constants '''
 K_POLY  = 0
@@ -33,6 +29,9 @@ STABLE = 'dorm_ter'
 
 ''' epsilon for float comparison '''
 EPS = 1e-3
+
+''' scale ymax in rendering by this factor '''
+MARGIN_SCALE = 1.1
 
 class ATRPBase(gym.Env):
 
@@ -70,21 +69,6 @@ class ATRPBase(gym.Env):
         mono_cap:     maximum quantity (budget) of monomer.
         (Other X_init, X_unit, X_cap variables have similar definitions.)
 
-    Reward related:
-        reward_mode:
-            'chain length' (cl): +1 reward once a unit amount of monomer
-                                 is converted to chain lengths in this range;
-            'distribution' (dn): rewards are based on distribution differences.
-        reward_chain_type: type of chain that the reward is related with.
-    'chain length' mode:
-        cl_range: range of desired chain lengths
-                  (left inclusive, right exclusive);
-        cl_unit:  unit of change in equivalent amount of monomer
-                  considered as rewarding.
-    'distribution' mode:
-        dn_distribution:  desired distribution (of the rewarding chain type).
-        dn_distance_type: distance type (wrt. target); 'l2' or 'emd'
-
     '''
 
     metadata = {'render.modes': ['human']}
@@ -98,9 +82,7 @@ class ATRPBase(gym.Env):
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=0.0,
-                 reward_mode='chain length', reward_chain_type=DORM,
-                 cl_range=(20, 30), cl_unit=0.01,
-                 dn_distribution=None, dn_distance_type='l2'):
+                 **kwargs):
         # setup the simulation system
         # fundamental properties of the polymerization process
         self.max_rad_len = max_rad_len
@@ -117,7 +99,7 @@ class ATRPBase(gym.Env):
         self.rate_constant = rate_constant
 
         # index (used in self.atrp and self.atrp_jac)
-        self.index = index = self.init_index()
+        self.index = self.init_index()
 
         # initial quant
         self.observation_mode = observation_mode.lower()
@@ -139,31 +121,7 @@ class ATRPBase(gym.Env):
         self.volume_unit = {MONO: mono_unit / mono_density,
                             SOL: sol_unit / sol_density}
 
-        # rewards
-        self.reward_mode = reward_mode.lower()
-        reward_chain_type = reward_chain_type.lower()
-        self.reward_chain_type = reward_chain_type
-        self.target_ymax = 0.0
-        if reward_chain_type == DORM or reward_chain_type == STABLE:
-            chain_min = 1
-        elif reward_chain_type == TER:
-            chain_min = 2
-        if self.reward_mode == 'chain length':
-            self.cl_unit = cl_unit
-            start, end = cl_range[0] - chain_min, cl_range[1] - chain_min
-            self.cl_slice = slice(start, end)
-            self.cl_num_mono = np.arange(*cl_range)
-        elif self.reward_mode == 'distribution':
-            if dn_distribution is None:
-                chain_slice = index[reward_chain_type]
-                dn_distribution = np.ones(chain_slice.stop - chain_slice.start)
-            dn_distribution = np.array(dn_distribution)
-            dn_num_mono = np.arange(chain_min, chain_min + len(dn_distribution))
-            dn_mono_quant = dn_distribution.dot(dn_num_mono)
-            self.dn_num_mono = dn_num_mono
-            self.dn_target_quant = dn_distribution / dn_mono_quant * mono_cap
-            self.target_ymax = np.max(self.dn_target_quant) * 1.1
-            self.dn_distance_type = dn_distance_type.lower()
+        self.init_reward(**kwargs)
 
         # rendering
         self.axes = None
@@ -178,9 +136,6 @@ class ATRPBase(gym.Env):
         self.last_action = None
         self.quant = self.quant_init
         self.volume = self.volume_init
-        if self.reward_mode == 'chain length':
-            chain = self.quant[self.index[self.reward_chain_type]]
-            self.last_reward_chain = chain[self.cl_slice]
         return self.observation()
 
     def _step(self, action):
@@ -373,27 +328,6 @@ class ATRPBase(gym.Env):
         quant *= ratio
         self.quant = quant
 
-    def reward(self, done):
-        chain = self.chain(self.reward_chain_type)
-        if self.reward_mode == 'chain length':
-            reward_chain = chain[self.cl_slice]
-            diff_reward_chain = reward_chain - self.last_reward_chain
-            self.last_reward_chain = reward_chain
-            reward = diff_reward_chain.dot(self.cl_num_mono)
-        elif self.reward_mode == 'distribution' and done:
-            dn_target_quant = self.dn_target_quant
-            if self.dn_distance_type == 'l2':
-                diff = chain - dn_target_quant
-                reward = -diff.dot(diff)
-            elif self.dn_distance_type == 'emd':
-                dtn = chain / np.sum(chain)
-                dtn_ref = dn_target_quant / np.sum(dn_target_quant)
-                dist_mat = squareform(pdist(np.array([self.dn_num_mono]).T))
-                reward = -pyemd.emd(dtn, dtn_ref, dist_mat)
-        else:
-            reward = 0.0
-        return reward
-
     def chain(self, key):
         quant = self.quant
         index = self.index
@@ -578,10 +512,7 @@ class ATRPBase(gym.Env):
         axis = plt.subplot(num_plots, 1, num)
         linspace = np.linspace(1, len_values, len_values)
         plot = axis.plot(linspace, values, label=label)[0]
-        if self.reward_mode == 'distribution' and key == self.reward_chain_type:
-            target_quant = self.dn_target_quant
-            target_label = 'Target distribution'
-            axis.plot(linspace, target_quant, 'r', label=target_label)
+        self.render_reward_init(key, axis)
         axis.legend()
         axis.set_xlim([0, self.max_chain_len])
         self.axes[key] = axis
@@ -589,11 +520,23 @@ class ATRPBase(gym.Env):
 
     def update_plot(self, key):
         values = self.chain(key)
-        ymax = np.max(values) * 1.1
-        if key == self.reward_chain_type:
-            ymax = max(ymax, self.target_ymax)
+        ymax = np.max(values) * MARGIN_SCALE
         if not ymax:
             ymax = EPS
-        self.axes[key].set_ylim([0, ymax])
+        axis = self.axes[key]
+        axis.set_ylim([0, ymax])
+        self.render_reward_update(key, axis)
         self.plots[key].set_ydata(values)
+
+    def init_reward(self, *args, **kwargs):
+        pass
+
+    def reward(self, *args, **kwargs):
+        return 0.0
+
+    def render_reward_init(self, *args, **kwargs):
+        pass
+
+    def render_reward_update(self, *args, **kwargs):
+        pass
 
