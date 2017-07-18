@@ -130,7 +130,7 @@ class ATRPEnv(gym.Env):
         action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
         action_space = gym.spaces.Tuple(action_tuple)
         self.action_pos = 0.0, 0.2, 0.4, 0.6, 0.8
-        self.action_numbers = MONO, CU1, CU2, DORM1, SOL
+        self.action_num = MONO, CU1, CU2, DORM1, SOL
         self.action_space = action_space
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
@@ -175,6 +175,7 @@ class ATRPEnv(gym.Env):
     def _reset(self):
         self.step_count = 0
         self.added = self.init_amount.copy()
+        self.last_action = None
         self.quant = self.quant_init
         self.volume = self.volume_init
         if self.reward_mode == 'chain length':
@@ -217,12 +218,13 @@ class ATRPEnv(gym.Env):
             action_axis.get_yaxis().set_visible(False)
             self.action_rect = {}
             action_labels = 'Monomer', 'Cu(I)', 'Cu(II)', 'Initiator', 'Solvent'
-            for pos, label, anum in zip(self.action_pos, action_labels, self.action_numbers):
+            zip_iter = zip(self.action_pos, action_labels, self.action_num)
+            for pos, label, anum in zip_iter:
                 color = 'y' if self.capped(anum) else 'r'
                 rect = patches.Rectangle((pos, 0.0), 0.18, 1.0,
                                          color=color, fill=True)
                 action_axis.add_patch(rect)
-                action_axis.annotate(label, (pos + 0.05, 0.4))
+                action_axis.annotate(label, (pos + 0.03, 0.4))
                 self.action_rect[pos] = rect
             plt.xlabel('Chain length')
             plt.tight_layout()
@@ -233,13 +235,16 @@ class ATRPEnv(gym.Env):
                 self.update_plot(TER)
                 stable_chains = self.stable_chains()
                 self.update_plot(STABLE, stable_chains)
-            for pos, act, anum in zip(self.action_pos, self.last_action, self.action_numbers):
-                rect = self.action_rect[pos]
-                if self.capped(anum):
-                    color = 'y'
-                else:
-                    color = 'g' if act else 'r'
-                rect.set_color(color)
+            last_action = self.last_action
+            if last_action is not None:
+                zip_iter = zip(self.action_pos, last_action, self.action_num)
+                for pos, act, anum in zip_iter:
+                    rect = self.action_rect[pos]
+                    if self.capped(anum):
+                        color = 'y'
+                    else:
+                        color = 'g' if act else 'r'
+                    rect.set_color(color)
         plt.draw()
         plt.pause(0.0001)
 
