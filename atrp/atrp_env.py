@@ -129,9 +129,9 @@ class ATRPEnv(gym.Env):
         # actions
         action_tuple = tuple(gym.spaces.Discrete(2) for _ in range(5))
         action_space = gym.spaces.Tuple(action_tuple)
+        self.action_space = action_space
         self.action_pos = 0.0, 0.2, 0.4, 0.6, 0.8
         self.action_num = MONO, CU1, CU2, DORM1, SOL
-        self.action_space = action_space
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
         self.add_cap = {MONO: mono_cap, CU1: cu1_cap, CU2: cu2_cap,
@@ -167,10 +167,6 @@ class ATRPEnv(gym.Env):
 
         # rendering
         self.axes = None
-        self.chain_label_dict = {DORM: 'Dormant chains',
-                                 RAD: 'Radical chains',
-                                 TER: 'Terminated chains',
-                                 STABLE: 'All stable chains'}
 
         # ode integrator
         odeint = ode(self.atrp, self.atrp_jac)
@@ -574,7 +570,11 @@ class ATRPEnv(gym.Env):
     def init_plot(self, key, num, num_plots):
         values = self.chain(key)
         len_values = len(values)
-        label = self.chain_label_dict[key]
+        chain_label_dict = {DORM: 'Dormant chains',
+                            RAD: 'Radical chains',
+                            TER: 'Terminated chains',
+                            STABLE: 'All stable chains'}
+        label = chain_label_dict[key]
         axis = plt.subplot(num_plots, 1, num)
         linspace = np.linspace(1, len_values, len_values)
         plot = axis.plot(linspace, values, label=label)[0]
