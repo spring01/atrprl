@@ -20,11 +20,11 @@ DORM1 = 3
 SOL   = 4
 
 ''' chain types '''
-DORM = 'dorm'
-RAD  = 'rad'
-TER  = 'ter'
-TER_A = 'ter_a'
-TER_B = 'ter_b'
+DORM   = 'dorm'
+RAD    = 'rad'
+TER    = 'ter'
+TER_A  = 'ter_a'
+TER_B  = 'ter_b'
 STABLE = 'dorm_ter'
 
 ''' epsilon for float comparison '''
