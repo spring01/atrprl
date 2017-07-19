@@ -6,14 +6,14 @@ from .atrp_base import ATRPBase, MONO, DORM, MARGIN_SCALE
 
 '''
 ATRP simulation environment aiming at achieving a target distribution.
-    Target is considered achieved if a two-sample Kolmogorov-Smirnov (KS) test
-    between ending/target distribution cannot be rejected, in which case
-    the environment gives a +1 reward.
-KS test: determined whether two samples are come from the same distribution
-    KS statistic: D_{n,m} = sup_x |F_{1,n}(x) - F_{2,m}(x)|;
-    KS test rejects null if D_{n,m} > c(\alpha) \sqrt{(n + m) / (n * m)};
-    c(\alpha) = 1.36 when \alpha = 0.05;
-    In this env, n = m = `ks_num_sample`.
+    Target is considered achieved if a Kolmogorov-Smirnov (KS) test
+    on the ending distribution, assuming identical to the target distribution,
+    cannot be rejected, in which case the environment gives a +1 reward.
+KS test: determined whether a sample set comes from the same distribution
+    KS statistic: D_n = sup_x |F_n(x) - F(x)|;
+    KS test rejects null if \sqrt{n} * D_n > c(\alpha);
+    c(\alpha) = 1.63 when \alpha = 0.01;
+    In this env, n = `ks_num_sample`.
 
 Actions:
     To simplify learning, actions are limited to "adding one species per action"
@@ -31,25 +31,28 @@ Input arguments:
     ks_num_sample:     number of sample used in KS test
 '''
 
-KS_FACTOR = 1.36 # corresponding value for alpha = 0.05
+KS_FACTOR = 1.63 # corresponding value for alpha = 0.05
 
 class ATRPTargetDistrib(ATRPBase):
 
     def _init_action(self, **kwargs):
         self.action_space = gym.spaces.Discrete(6)
+        self.parse_action_dict = {0: (0, 0, 0, 0, 0),
+                                  1: (1, 0, 0, 0, 0),
+                                  2: (0, 1, 0, 0, 0),
+                                  3: (0, 0, 1, 0, 0),
+                                  4: (0, 0, 0, 1, 0),
+                                  5: (0, 0, 0, 0, 1)}
 
     def _parse_action(self, action):
-        parsed_action = [0] * 5
-        if action:
-            parsed_action[action - 1] = 1
-        return parsed_action
+        return self.parse_action_dict[action]
 
     def _init_reward(self, reward_chain_type=DORM, dn_distribution=None,
-                     ks_num_sample=5e3):
+                     ks_num_sample=2e3):
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
         self.dn_distribution = dn_distribution = np.array(dn_distribution)
-        self.ks_num_sample = ks_num_sample
+        self.max_accept = KS_FACTOR / np.sqrt(ks_num_sample)
         dn_num_mono = np.arange(1, 1 + len(dn_distribution))
         dn_mono_quant = dn_distribution.dot(dn_num_mono)
         self.dn_num_mono = dn_num_mono
@@ -66,8 +69,7 @@ class ATRPTargetDistrib(ATRPBase):
             current = chain / np.sum(chain)
             cdf_current = np.cumsum(current)
             ks_stat = np.max(np.abs(cdf_target - cdf_current))
-            ks_test = ks_stat < KS_FACTOR * np.sqrt(2.0 / self.ks_num_sample)
-            reward = float(ks_test)
+            reward = float(ks_stat < self.max_accept)
         else:
             reward = 0.0
         return reward

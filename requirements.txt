@@ -2,5 +2,6 @@ numpy
 scipy
 matplotlib
 gym
+pillow
 tensorflow>=1.1
 keras>=2.0
