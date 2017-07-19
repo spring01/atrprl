@@ -1,24 +1,39 @@
 
 import numpy as np
 import gym.spaces
-from .atrp_base import ATRPBase, MONO, MARGIN_SCALE
+from .atrp_base import ATRPBase, MONO, DORM, MARGIN_SCALE
 
+
+'''
+ATRP simulation environment aiming at achieving a target distribution.
+    Target is considered achieved if a two-sample Kolmogorov-Smirnov (KS) test
+    between ending/target distribution cannot be rejected, in which case
+    the environment gives a +1 reward.
+KS test: determined whether two samples are come from the same distribution
+    KS statistic: D_{n,m} = sup_x |F_{1,n}(x) - F_{2,m}(x)|;
+    KS test rejects null if D_{n,m} > c(\alpha) \sqrt{(n + m) / (n * m)};
+    c(\alpha) = 1.36 when \alpha = 0.05;
+    In this env, n = m = `ks_num_sample`.
+
+Actions:
+    To simplify learning, actions are limited to "adding one species per action"
+    Action space is Discrete(6).
+    Mapping used by `_parse_action`:
+        0 --> (0, 0, 0, 0, 0)
+        1 --> (1, 0, 0, 0, 0)
+        2 --> (0, 1, 0, 0, 0)
+        3 --> (0, 0, 1, 0, 0)
+        4 --> (0, 0, 0, 1, 0)
+        5 --> (0, 0, 0, 0, 1)
+Input arguments:
+    reward_chain_type: type of chain that the reward is related with;
+    dn_distribution:   target distribution (of the rewarding chain type);
+    ks_num_sample:     number of sample used in KS test
+'''
 
 KS_FACTOR = 1.36 # corresponding value for alpha = 0.05
 
-'''
-Action space is Discrete(6):
-    0 --> (0, 0, 0, 0, 0)
-    1 --> (1, 0, 0, 0, 0)
-    2 --> (0, 1, 0, 0, 0)
-    3 --> (0, 0, 1, 0, 0)
-    4 --> (0, 0, 0, 1, 0)
-    5 --> (0, 0, 0, 0, 1)
-Reward based on difference between the ending/target distributions:
-    reward_chain_type: type of chain that the reward is related with.
-    dn_distribution:   target distribution (of the rewarding chain type).
-'''
-class ATRPDistribution(ATRPBase):
+class ATRPTargetDistrib(ATRPBase):
 
     def _init_action(self, **kwargs):
         self.action_space = gym.spaces.Discrete(6)
@@ -29,7 +44,7 @@ class ATRPDistribution(ATRPBase):
             parsed_action[action - 1] = 1
         return parsed_action
 
-    def _init_reward(self, reward_chain_type='dorm', dn_distribution=None,
+    def _init_reward(self, reward_chain_type=DORM, dn_distribution=None,
                      ks_num_sample=5e3):
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
