@@ -114,7 +114,6 @@ from hcdrl.common.util import get_output_folder
 from hcdrl.common.envwrapper import HistoryStacker
 from hcdrl.common.interface import list_arrays_ravel
 from hcdrl.simple_nets import simple_acnet
-import atrp_ps
 
 def worker(args):
 
