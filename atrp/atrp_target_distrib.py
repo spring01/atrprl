@@ -19,12 +19,12 @@ Actions:
     To simplify learning, actions are limited to "adding one species per action"
     Action space is Discrete(6).
     Mapping used by `_parse_action`:
-        0 --> (0, 0, 0, 0, 0)
-        1 --> (1, 0, 0, 0, 0)
-        2 --> (0, 1, 0, 0, 0)
-        3 --> (0, 0, 1, 0, 0)
-        4 --> (0, 0, 0, 1, 0)
-        5 --> (0, 0, 0, 0, 1)
+        0 --> (0, 0, 0, 0, 0) 'No-op'
+        1 --> (1, 0, 0, 0, 0) 'Add a unit amount of monomer'
+        2 --> (0, 1, 0, 0, 0) 'Add a unit amount of Cu(I)'
+        3 --> (0, 0, 1, 0, 0) 'Add a unit amount of Cu(II)'
+        4 --> (0, 0, 0, 1, 0) 'Add a unit amount of initiator (dorm1)'
+        5 --> (0, 0, 0, 0, 1) 'Add a unit amount of solvent'
 Input arguments:
     reward_chain_type: type of chain that the reward is related with;
     dn_distribution:   target distribution (of the rewarding chain type);
