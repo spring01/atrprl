@@ -28,7 +28,7 @@ Actions:
 Input arguments:
     reward_chain_type: type of chain that the reward is related with;
     dn_distribution:   target distribution (of the rewarding chain type);
-    ks_num_sample:     number of sample used in KS test
+    ks_num_sample:     number of sample used in KS test.
 '''
 
 KS_FACTOR = 1.63 # corresponding value for alpha = 0.01
