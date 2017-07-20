@@ -22,8 +22,12 @@ def arguments():
     parser = argparse.ArgumentParser(description='A3C ATRP')
 
     # environment name
-    parser.add_argument('--env', default='ATRP-polystyrene-v0',
+    parser.add_argument('--env', default='ATRP-ps-td-v1',
         help='Environment name')
+    parser.add_argument('--env_num_frames', default=4, type=int,
+        help='Number of frames in a state')
+    parser.add_argument('--env_act_steps', default=4, type=int,
+        help='Do an action for how many steps')
 
     # A3C arguments
     parser.add_argument('--a3c_running_mode', default='trainer', type=str,
@@ -99,7 +103,7 @@ def trainer(args):
 
 ''' worker block '''
 import signal
-import gym
+import gym, atrp_ps_td
 import tensorflow as tf
 from hcdrl.a3c.a3c import A3C
 from hcdrl.a3c.rollout import Rollout
@@ -107,6 +111,8 @@ from hcdrl.a3c.step_counter import StepCounter
 from hcdrl.common.policy import Stochastic
 from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.common.util import get_output_folder
+from hcdrl.common.envwrapper import HistoryStacker
+from hcdrl.common.interface import list_arrays_ravel
 from hcdrl.simple_nets import simple_acnet
 import atrp_ps
 
@@ -114,7 +120,8 @@ def worker(args):
 
     # environment
     env = gym.make(args.env)
-    input_shape = env.observation_space.shape
+    env = HistoryStacker(env, args.env_num_frames, args.env_act_steps)
+    input_shape = sum(sp.shape[0] for sp in env.observation_space.spaces),
     num_actions = env.action_space.n
 
     # ports, cluster, and server
@@ -159,7 +166,7 @@ def worker(args):
             obj.set_session(sess)
         agent = A3C(is_master=is_master,
                     acnet_global=acnet_global, acnet_local=acnet_local,
-                    state_to_input=lambda x: x,
+                    state_to_input=list_arrays_ravel,
                     policy=policy, rollout=rollout,
                     discount=args.rl_discount,
                     train_steps=args.rl_train_steps,
