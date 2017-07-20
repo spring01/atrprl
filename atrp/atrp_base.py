@@ -60,9 +60,6 @@ class ATRPBase(gym.Env):
                           of stable species.
 
     Action related:
-        action_mode:
-            'multi':  feeds multiple species in at each timestep;
-            'single': feeds 1 species in at each timestep.
         mono_init:    initial quantity of monomer;
         mono_density: density of monomer (useful in calculating the volume);
         mono_unit:    unit amount of the "adding monomer" action;
