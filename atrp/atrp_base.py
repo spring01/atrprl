@@ -273,7 +273,8 @@ class ATRPBase(gym.Env):
     def add(self, action, key, change_quant=True):
         if action[key] and not self.capped(key):
             unit = self.add_unit[key]
-            amount = min(unit, self.add_cap[key] - self.added[key])
+            cap = self.add_cap[key]
+            amount = unit if cap is None else min(unit, cap - self.added[key])
             amount = max(amount, 0.0)
             if change_quant:
                 self.quant[self.index[key]] += amount
