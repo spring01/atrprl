@@ -31,7 +31,7 @@ Input arguments:
     ks_num_sample:     number of sample used in KS test
 '''
 
-KS_FACTOR = 1.63 # corresponding value for alpha = 0.05
+KS_FACTOR = 1.63 # corresponding value for alpha = 0.01
 
 class ATRPTargetDistrib(ATRPBase):
 
