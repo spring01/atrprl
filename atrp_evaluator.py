@@ -62,8 +62,6 @@ def main():
     args = parser.parse_args()
     render = args.render.lower() in ['true', 't']
 
-    print('########## All arguments:', args)
-
     # environment
     env = gym.make(args.env)
     env = HistoryStacker(env, args.env_num_frames, args.env_act_steps)
