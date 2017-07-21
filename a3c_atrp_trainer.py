@@ -109,10 +109,10 @@ from hcdrl.a3c.a3c import A3C
 from hcdrl.a3c.rollout import Rollout
 from hcdrl.a3c.step_counter import StepCounter
 from hcdrl.common.policy import Stochastic
-from hcdrl.common.neuralnet.acnet import ACNet
-from hcdrl.common.util import get_output_folder
 from hcdrl.common.envwrapper import HistoryStacker
 from hcdrl.common.interface import list_arrays_ravel
+from hcdrl.common.util import get_output_folder
+from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.simple_nets import simple_acnet
 
 def worker(args):

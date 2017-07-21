@@ -10,10 +10,12 @@ import argparse
 import numpy as np
 import tensorflow as tf
 from hcdrl.common.policy import EpsGreedy, Stochastic
+from hcdrl.common.envwrapper import HistoryStacker
+from hcdrl.common.interface import list_arrays_ravel
 from hcdrl.common.neuralnet.qnet import QNet
 from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.simple_nets import simple_acnet, simple_qnet
-import atrp_ps
+import atrp_ps_td
 
 
 episode_maxlen = 100000
@@ -22,8 +24,12 @@ def main():
     parser = argparse.ArgumentParser(description='Deep RL ATRP')
 
     # environment name
-    parser.add_argument('--env', default='ATRP-polystyrene-v0',
+    parser.add_argument('--env', default='ATRP-ps-td-v1',
         help='Environment name')
+    parser.add_argument('--env_num_frames', default=4, type=int,
+        help='Number of frames in a state')
+    parser.add_argument('--env_act_steps', default=4, type=int,
+        help='Do an action for how many steps')
 
     # policy arguments
     parser.add_argument('--policy_type', default='stochastic', type=str,
@@ -60,7 +66,8 @@ def main():
 
     # environment
     env = gym.make(args.env)
-    input_shape = env.observation_space.shape
+    env = HistoryStacker(env, args.env_num_frames, args.env_act_steps)
+    input_shape = sum(sp.shape[0] for sp in env.observation_space.spaces),
     num_actions = env.action_space.n
 
     # neural net
@@ -89,6 +96,7 @@ def main():
             env.render()
         total_rewards = 0.0
         for i in range(episode_maxlen):
+            state = list_arrays_ravel(state)
             action_values = net.action_values(np.stack([state]))[0]
             action = policy.select_action(action_values)
             state, reward, done, info = env.step(action)
