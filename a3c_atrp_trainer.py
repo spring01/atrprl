@@ -46,7 +46,7 @@ def arguments():
     # reinforcement learning arguments
     parser.add_argument('--rl_save_path', default='output',
         help='Directory to save data to')
-    parser.add_argument('--rl_discount', default=0.999, type=float,
+    parser.add_argument('--rl_discount', default=0.99, type=float,
         help='Discount factor gamma')
     parser.add_argument('--rl_learning_rate', default=1e-4, type=float,
         help='Learning rate')
