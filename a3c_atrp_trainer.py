@@ -58,7 +58,7 @@ def arguments():
         help='Interval to save weights')
 
     # rollout arguments
-    parser.add_argument('--rollout_maxlen', default=5, type=int,
+    parser.add_argument('--rollout_maxlen', default=20, type=int,
         help='Maximum length of partial rollout to calculate value target')
 
     # neural net arguments
