@@ -26,7 +26,7 @@ def main():
     # environment name
     parser.add_argument('--env', default=None, required=True,
         help='Environment name')
-    parser.add_argument('--env_num_frames', default=4, type=int,
+    parser.add_argument('--env_num_frames', default=1, type=int,
         help='Number of frames in a state')
     parser.add_argument('--env_act_steps', default=4, type=int,
         help='Do an action for how many steps')
