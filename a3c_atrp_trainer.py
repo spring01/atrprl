@@ -22,7 +22,7 @@ def arguments():
     parser = argparse.ArgumentParser(description='A3C ATRP')
 
     # environment name
-    parser.add_argument('--env', default='ATRP-ps-td-v1',
+    parser.add_argument('--env', default=None, required=True,
         help='Environment name')
     parser.add_argument('--env_num_frames', default=4, type=int,
         help='Number of frames in a state')
