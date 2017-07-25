@@ -82,7 +82,7 @@ def trainer(args):
     worker_list = []
     for worker_index in range(num_workers):
         args_dict['dtf_worker_index'] = worker_index
-        run_list = ['python', __file__]
+        run_list = ['python', '-u', __file__]
         for key, value in args_dict.items():
             run_list.append('--{}'.format(key))
             if type(value) == list:
