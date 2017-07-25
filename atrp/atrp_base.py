@@ -155,6 +155,7 @@ class ATRPBase(gym.Env):
                 plt.close()
             return
         if self.axes is None:
+            plt.figure()
             self.axes = {}
             self.plots = {}
             num_plots = 5 if self.termination else 3
