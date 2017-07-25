@@ -2,6 +2,7 @@
 from gym.envs.registration import register
 
 
+''' Two-level reward environments. +1 if close, +2 if very close. '''
 entry_point = 'atrp:ATRPTargetDistribution'
 max_episode_steps = 100000
 kwargs_common = {
