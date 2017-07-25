@@ -1,7 +1,9 @@
 
 from gym.envs.registration import register
 
-
+''' train with loose_ks_num_sample (v0 envs) first and then train on v1 envs '''
+loose_ks_num_sample = 2e3
+tight_ks_num_sample = 1e4
 kwargs_common = {
     'max_rad_len': 100,
     'step_time': 1e2,
@@ -29,7 +31,7 @@ kwargs_common = {
     'sol_init': 0.01,
     'sol_cap': 0.0,
     'reward_chain_type': 'dorm',
-    'ks_num_sample': 2e3,
+    'ks_num_sample': loose_ks_num_sample,
 }
 
 var24 = [6.31782376e-11,   1.47405524e-09,   1.72059392e-08,   1.33967606e-07,
@@ -57,13 +59,21 @@ var24 = [6.31782376e-11,   1.47405524e-09,   1.72059392e-08,   1.33967606e-07,
          5.18449522e-24,   1.41262252e-24,   3.80756939e-25,   1.01537316e-25,
          2.67924646e-26,   6.99617510e-27,   1.80809202e-27,   4.62532293e-28,
          1.17131604e-28,   2.93673324e-29,   7.29054903e-30,   1.79228618e-30,]
-kwargs_var24 = kwargs_common.copy()
-kwargs_var24['dn_distribution'] = var24
+kwargs_var24_v0 = kwargs_common.copy()
+kwargs_var24_v0['dn_distribution'] = var24
 register(
     id='ATRP-ps-td-var24-v0',
     entry_point='atrp:ATRPTargetDistrib',
     max_episode_steps=100000,
-    kwargs=kwargs_var24
+    kwargs=kwargs_var24_v0
+)
+kwargs_var24_v1 = kwargs_var24_v0.copy()
+kwargs_var24_v1['ks_num_sample'] = tight_ks_num_sample
+register(
+    id='ATRP-ps-td-var24-v1',
+    entry_point='atrp:ATRPTargetDistrib',
+    max_episode_steps=100000,
+    kwargs=kwargs_var24_v1
 )
 
 var26 = [1.53326528e-10,   3.34026207e-09,   3.64635447e-08,   2.65983463e-07,
@@ -91,13 +101,21 @@ var26 = [1.53326528e-10,   3.34026207e-09,   3.64635447e-08,   2.65983463e-07,
          3.96304848e-23,   1.12073378e-23,   3.13505336e-24,   8.67581535e-25,
          2.37547768e-25,   6.43603276e-26,   1.72568891e-26,   4.57965836e-27,
          1.20303526e-27,   3.12856938e-28,   8.05530432e-29,   2.05367886e-29,]
-kwargs_var26 = kwargs_common.copy()
-kwargs_var26['dn_distribution'] = var26
+kwargs_var26_v0 = kwargs_common.copy()
+kwargs_var26_v0['dn_distribution'] = var26
 register(
     id='ATRP-ps-td-var26-v0',
     entry_point='atrp:ATRPTargetDistrib',
     max_episode_steps=100000,
-    kwargs=kwargs_var26
+    kwargs=kwargs_var26_v0
+)
+kwargs_var26_v1 = kwargs_var26_v0.copy()
+kwargs_var26_v1['ks_num_sample'] = tight_ks_num_sample
+register(
+    id='ATRP-ps-td-var26-v1',
+    entry_point='atrp:ATRPTargetDistrib',
+    max_episode_steps=100000,
+    kwargs=kwargs_var26_v1
 )
 
 var28 = [2.95686388e-10,   6.10952723e-09,   6.33231073e-08,   4.39093450e-07,
@@ -125,13 +143,21 @@ var28 = [2.95686388e-10,   6.10952723e-09,   6.33231073e-08,   4.39093450e-07,
          7.49262571e-21,   2.36545875e-21,   7.38700188e-22,   2.28214434e-22,
          6.97573141e-23,   2.10987591e-23,   6.31527853e-24,   1.87086992e-24,
          5.48600731e-25,   1.59248842e-25,   4.57665208e-26,   1.30231203e-26,]
-kwargs_var28 = kwargs_common.copy()
-kwargs_var28['dn_distribution'] = var28
+kwargs_var28_v0 = kwargs_common.copy()
+kwargs_var28_v0['dn_distribution'] = var28
 register(
     id='ATRP-ps-td-var28-v0',
     entry_point='atrp:ATRPTargetDistrib',
     max_episode_steps=100000,
-    kwargs=kwargs_var28
+    kwargs=kwargs_var28_v0
+)
+kwargs_var28_v1 = kwargs_var28_v0.copy()
+kwargs_var28_v1['ks_num_sample'] = tight_ks_num_sample
+register(
+    id='ATRP-ps-td-var28-v1',
+    entry_point='atrp:ATRPTargetDistrib',
+    max_episode_steps=100000,
+    kwargs=kwargs_var28_v1
 )
 
 var31 = [3.14319718e-10,   6.58362722e-09,   6.90967661e-08,   4.84538191e-07,
@@ -159,13 +185,21 @@ var31 = [3.14319718e-10,   6.58362722e-09,   6.90967661e-08,   4.84538191e-07,
          1.14408194e-20,   3.58149619e-21,   1.10895133e-21,   3.39667653e-22,
          1.02929911e-22,   3.08621123e-23,   9.15706400e-24,   2.68894753e-24,
          7.81541135e-25,   2.24859796e-25,   6.40484108e-26,   1.80628683e-26,]
-kwargs_var31 = kwargs_common.copy()
-kwargs_var31['dn_distribution'] = var31
+kwargs_var31_v0 = kwargs_common.copy()
+kwargs_var31_v0['dn_distribution'] = var31
 register(
     id='ATRP-ps-td-var31-v0',
     entry_point='atrp:ATRPTargetDistrib',
     max_episode_steps=100000,
-    kwargs=kwargs_var31
+    kwargs=kwargs_var31_v0
+)
+kwargs_var31_v1 = kwargs_var31_v0.copy()
+kwargs_var31_v1['ks_num_sample'] = tight_ks_num_sample
+register(
+    id='ATRP-ps-td-var31-v1',
+    entry_point='atrp:ATRPTargetDistrib',
+    max_episode_steps=100000,
+    kwargs=kwargs_var31_v1
 )
 
 var36 = [6.88942786e-10,   1.37581929e-08,   1.37644476e-07,   9.20015483e-07,
@@ -193,13 +227,21 @@ var36 = [6.88942786e-10,   1.37581929e-08,   1.37644476e-07,   9.20015483e-07,
          1.25595300e-18,   4.28263495e-19,   1.44428383e-19,   4.81782841e-20,
          1.58986310e-20,   5.19073671e-21,   1.67690837e-21,   5.36105036e-22,
          1.69628503e-22,   5.31255397e-23,   1.64706116e-23,   5.05549033e-24,]
-kwargs_var36 = kwargs_common.copy()
-kwargs_var36['dn_distribution'] = var36
+kwargs_var36_v0 = kwargs_common.copy()
+kwargs_var36_v0['dn_distribution'] = var36
 register(
     id='ATRP-ps-td-var36-v0',
     entry_point='atrp:ATRPTargetDistrib',
     max_episode_steps=100000,
-    kwargs=kwargs_var36
+    kwargs=kwargs_var36_v0
+)
+kwargs_var36_v1 = kwargs_var36_v0.copy()
+kwargs_var36_v1['ks_num_sample'] = tight_ks_num_sample
+register(
+    id='ATRP-ps-td-var36-v1',
+    entry_point='atrp:ATRPTargetDistrib',
+    max_episode_steps=100000,
+    kwargs=kwargs_var36_v1
 )
 
 var41 = [4.48698736e-09,   7.82447792e-08,   6.85361659e-07,   4.02190348e-06,
@@ -227,13 +269,21 @@ var41 = [4.48698736e-09,   7.82447792e-08,   6.85361659e-07,   4.02190348e-06,
          4.94730265e-18,   1.73823444e-18,   6.04139096e-19,   2.07734153e-19,
          7.06762893e-20,   2.37950074e-20,   7.92856395e-21,   2.61486383e-21,
          8.53685169e-22,   2.75922928e-22,   8.83009879e-23,   2.79818522e-23,]
-kwargs_var41 = kwargs_common.copy()
-kwargs_var41['dn_distribution'] = var41
+kwargs_var41_v0 = kwargs_common.copy()
+kwargs_var41_v0['dn_distribution'] = var41
 register(
     id='ATRP-ps-td-var41-v0',
     entry_point='atrp:ATRPTargetDistrib',
     max_episode_steps=100000,
-    kwargs=kwargs_var41
+    kwargs=kwargs_var41_v0
+)
+kwargs_var41_v1 = kwargs_var41_v0.copy()
+kwargs_var41_v1['ks_num_sample'] = tight_ks_num_sample
+register(
+    id='ATRP-ps-td-var41-v1',
+    entry_point='atrp:ATRPTargetDistrib',
+    max_episode_steps=100000,
+    kwargs=kwargs_var41_v1
 )
 
 var49 = [4.27536053e-09,   7.77258204e-08,   7.07354785e-07,   4.29710393e-06,
@@ -261,12 +311,20 @@ var49 = [4.27536053e-09,   7.77258204e-08,   7.07354785e-07,   4.29710393e-06,
          2.66969897e-16,   1.01800152e-16,   3.83980731e-17,   1.43283916e-17,
          5.29009634e-18,   1.93267118e-18,   6.98762790e-19,   2.50050185e-19,
          8.85722096e-20,   3.10589686e-20,   1.07830424e-20,   3.70684935e-21,]
-kwargs_var49 = kwargs_common.copy()
-kwargs_var49['dn_distribution'] = var49
+kwargs_var49_v0 = kwargs_common.copy()
+kwargs_var49_v0['dn_distribution'] = var49
 register(
     id='ATRP-ps-td-var49-v0',
     entry_point='atrp:ATRPTargetDistrib',
     max_episode_steps=100000,
-    kwargs=kwargs_var49
+    kwargs=kwargs_var49_v0
+)
+kwargs_var49_v1 = kwargs_var49_v0.copy()
+kwargs_var49_v1['ks_num_sample'] = tight_ks_num_sample
+register(
+    id='ATRP-ps-td-var49-v1',
+    entry_point='atrp:ATRPTargetDistrib',
+    max_episode_steps=100000,
+    kwargs=kwargs_var49_v1
 )
 
