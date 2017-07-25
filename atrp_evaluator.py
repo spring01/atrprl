@@ -5,6 +5,7 @@ Supports both DQN and A3C
 
 import os
 os.environ['OMP_NUM_THREADS'] = '1'
+import importlib
 import gym
 import argparse
 import numpy as np
@@ -15,7 +16,6 @@ from hcdrl.common.interface import list_arrays_ravel
 from hcdrl.common.neuralnet.qnet import QNet
 from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.simple_nets import simple_acnet, simple_qnet
-import atrp_ps_td
 
 
 episode_maxlen = 100000
@@ -26,6 +26,8 @@ def main():
     # environment name
     parser.add_argument('--env', default=None, required=True,
         help='Environment name')
+    parser.add_argument('--env_import', default=None, required=True,
+        help='File name where the environment is defined')
     parser.add_argument('--env_num_frames', default=1, type=int,
         help='Number of frames in a state')
     parser.add_argument('--env_act_steps', default=4, type=int,
@@ -63,6 +65,7 @@ def main():
     render = args.render.lower() in ['true', 't']
 
     # environment
+    importlib.import_module(args.env_import)
     env = gym.make(args.env)
     env = HistoryStacker(env, args.env_num_frames, args.env_act_steps)
     input_shape = sum(sp.shape[0] for sp in env.observation_space.spaces),

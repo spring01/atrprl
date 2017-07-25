@@ -24,6 +24,8 @@ def arguments():
     # environment name
     parser.add_argument('--env', default=None, required=True,
         help='Environment name')
+    parser.add_argument('--env_import', default=None, required=True,
+        help='File name where the environment is defined')
     parser.add_argument('--env_num_frames', default=1, type=int,
         help='Number of frames in a state')
     parser.add_argument('--env_act_steps', default=4, type=int,
@@ -102,8 +104,9 @@ def trainer(args):
 
 
 ''' worker block '''
+import importlib
 import signal
-import gym, atrp_ps_td
+import gym
 import tensorflow as tf
 from hcdrl.a3c.a3c import A3C
 from hcdrl.a3c.rollout import Rollout
@@ -116,6 +119,7 @@ from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.simple_nets import simple_acnet
 
 def worker(args):
+    importlib.import_module(args.env_import)
 
     # environment
     env = gym.make(args.env)
