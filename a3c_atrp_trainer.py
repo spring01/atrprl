@@ -54,6 +54,8 @@ def arguments():
         help='Learning rate')
     parser.add_argument('--rl_train_steps', default=1000000, type=int,
         help='Number of training sample interactions with the environment')
+    parser.add_argument('--rl_load_weights', default=None,
+        help='If specified, load weights and start training from there')
 
     # intervals
     parser.add_argument('--interval_save', default=10000, type=int,
@@ -86,12 +88,13 @@ def trainer(args):
         args_dict['dtf_worker_index'] = worker_index
         run_list = ['python', '-u', __file__]
         for key, value in args_dict.items():
-            run_list.append('--{}'.format(key))
-            if type(value) == list:
-                for val in map(str, value):
-                    run_list.append(val)
-            else:
-                run_list.append(str(value))
+            if value is not None:
+                run_list.append('--{}'.format(key))
+                if type(value) == list:
+                    for val in map(str, value):
+                        run_list.append(val)
+                else:
+                    run_list.append(str(value))
         worker = subprocess.Popen(run_list, stderr=subprocess.STDOUT)
         worker_list.append(worker)
     try:
@@ -176,10 +179,12 @@ def worker(args):
                     step_counter=step_counter_global,
                     interval_save=args.interval_save)
 
-        # set output path if this is the master worker
+        # set output path and try read weights if this is the master worker
         if is_master:
             output = get_output_folder(args.rl_save_path, args.env)
             agent.set_output(output)
+            if args.rl_load_weights is not None:
+                acnet_global.load_weights(args.rl_load_weights)
 
         # train the agent
         agent.train(env)
