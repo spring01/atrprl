@@ -6,9 +6,14 @@ from .atrp_base import ATRPBase, MONO, DORM, MARGIN_SCALE
 
 '''
 ATRP simulation environment aiming at achieving a target distribution.
-    Target is considered achieved if the maximum difference in pdf is less than
-    a given threshold. +1 reward if less than `thres_loose`, +2 if less than
-    `thres_tight`.
+    Target is considered achieved if a Kolmogorov-Smirnov (KS) test
+    on the ending distribution, assuming identical to the target distribution,
+    cannot be rejected, in which case the environment gives a +1 reward.
+KS test: determined whether a sample set comes from the same distribution
+    KS statistic: D_n = sup_x |F_n(x) - F(x)|;
+    KS test rejects null if \sqrt{n} * D_n > c(\alpha);
+    c(\alpha) = 1.63 when \alpha = 0.01;
+    In this env, n = `ks_num_sample`.
 
 Actions:
     To simplify learning, actions are limited to "adding one species per action"
@@ -23,9 +28,10 @@ Actions:
 Input arguments:
     reward_chain_type: type of chain that the reward is related with;
     dn_distribution:   target distribution (of the rewarding chain type);
-    thres_loose:       loose threshold for agreement of distributions;
-    thres_tight:       tight threshold for agreement of distributions.
+    ks_num_sample:     number of sample used in KS test.
 '''
+
+KS_FACTOR = 1.63 # corresponding value for alpha = 0.01
 
 class ATRPTargetDistribution(ATRPBase):
 
@@ -42,12 +48,12 @@ class ATRPTargetDistribution(ATRPBase):
         return self.parse_action_dict[action]
 
     def _init_reward(self, reward_chain_type=DORM, dn_distribution=None,
-                     thres_loose=5e-3, thres_tight=1e-3):
+                     ks_num_sample_loose=1e3, ks_num_sample_tight=1e4):
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
         self.dn_distribution = dn_distribution = np.array(dn_distribution)
-        self.thres_loose = thres_loose
-        self.thres_tight = thres_tight
+        self.max_accept_loose = KS_FACTOR / np.sqrt(ks_num_sample_loose)
+        self.max_accept_tight = KS_FACTOR / np.sqrt(ks_num_sample_tight)
         dn_num_mono = np.arange(1, 1 + len(dn_distribution))
         dn_mono_quant = dn_distribution.dot(dn_num_mono)
         self.dn_num_mono = dn_num_mono
@@ -60,10 +66,12 @@ class ATRPTargetDistribution(ATRPBase):
             chain = self.chain(self.reward_chain_type)
             dn_distribution = self.dn_distribution
             target = dn_distribution / np.sum(dn_distribution)
+            cdf_target = np.cumsum(target)
             current = chain / np.sum(chain)
-            max_diff = np.max(np.abs(target - current))
-            reward = float(max_diff < self.thres_loose)
-            reward += float(max_diff < self.thres_tight)
+            cdf_current = np.cumsum(current)
+            ks_stat = np.max(np.abs(cdf_target - cdf_current))
+            reward = float(ks_stat < self.max_accept_loose)
+            reward += float(ks_stat < self.max_accept_tight)
         else:
             reward = 0.0
         return reward
