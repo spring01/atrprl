@@ -32,8 +32,8 @@ kwargs_common = {
     'sol_init': 0.01,
     'sol_cap': 0.0,
     'reward_chain_type': 'dorm',
-    'ks_num_sample_loose': 2e3,
-    'ks_num_sample_tight': 1e4,
+    'thres_loose': 5e-3,
+    'thres_tight': 1e-3,
 }
 
 var24 = [6.31782376e-11,   1.47405524e-09,   1.72059392e-08,   1.33967606e-07,
