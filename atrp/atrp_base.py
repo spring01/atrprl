@@ -130,7 +130,7 @@ class ATRPBase(gym.Env):
         self.step_count = 0
         self.added = self.init_amount.copy()
         self.last_action = None
-        self.quant = self.quant_init
+        self.quant = self.quant_init.copy()
         self.volume = self.volume_init
         return self.observation()
 
