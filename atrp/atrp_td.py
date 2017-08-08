@@ -42,12 +42,15 @@ class ATRPTargetDistribution(ATRPBase):
         return self.parse_action_dict[action]
 
     def _init_reward(self, reward_chain_type=DORM, dn_distribution=None,
-                     thres_loose=5e-3, thres_tight=1e-3):
+                     thres_loose=5e-3, thres_tight=2e-3,
+                     reward_loose=0.1, reward_tight=1.0):
         reward_chain_type = reward_chain_type.lower()
         self.reward_chain_type = reward_chain_type
         self.dn_distribution = dn_distribution = np.array(dn_distribution)
         self.thres_loose = thres_loose
         self.thres_tight = thres_tight
+        self.reward_loose = reward_loose
+        self.reward_tight = reward_tight
         dn_num_mono = np.arange(1, 1 + len(dn_distribution))
         dn_mono_quant = dn_distribution.dot(dn_num_mono)
         self.dn_num_mono = dn_num_mono
@@ -62,8 +65,11 @@ class ATRPTargetDistribution(ATRPBase):
             target = dn_distribution / np.sum(dn_distribution)
             current = chain / np.sum(chain)
             max_diff = np.max(np.abs(target - current))
-            reward = float(max_diff < self.thres_loose)
-            reward += float(max_diff < self.thres_tight)
+            reward = 0.0
+            if max_diff < self.thres_loose:
+                reward = self.reward_loose
+            if max_diff < self.thres_tight:
+                reward = self.reward_tight
         else:
             reward = 0.0
         return reward
