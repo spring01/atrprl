@@ -56,8 +56,8 @@ register(
 
 kwargs_v2 = kwargs_common.copy()
 kwargs_v2['dn_distribution'] = gv48
-kwargs_v2['thres_loose'] = 0.5
-kwargs_v2['thres_tight'] = 1.0
+kwargs_v2['reward_loose'] = 0.5
+kwargs_v2['reward_tight'] = 1.0
 register(
     id='ATRP-ps-td-gv48-test4-v2',
     entry_point=entry_point,
@@ -67,8 +67,8 @@ register(
 
 kwargs_v3 = kwargs_common.copy()
 kwargs_v3['dn_distribution'] = gv48
-kwargs_v3['thres_loose'] = 1.0
-kwargs_v3['thres_tight'] = 10.0
+kwargs_v3['reward_loose'] = 1.0
+kwargs_v3['reward_tight'] = 10.0
 register(
     id='ATRP-ps-td-gv48-test4-v3',
     entry_point=entry_point,
