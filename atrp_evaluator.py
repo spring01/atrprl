@@ -57,12 +57,14 @@ def main():
 
     # rendering
     parser.add_argument('--render', default='true', type=str,
-        choices=['true', 'True', 't', 'T', 'false', 'False', 'f', 'F'],
+        choices=['true', 't', 'false', 'f', 'end'],
         help='Do rendering or not')
 
     # parse arguments
     args = parser.parse_args()
-    render = args.render.lower() in ['true', 't']
+    render = args.render.lower()
+    render_always = render in ['true', 't']
+    render_end = render == 'end'
 
     # environment
     importlib.import_module(args.env_import)
@@ -93,7 +95,7 @@ def main():
     all_total_rewards = []
     for _ in range(args.eval_episodes):
         state = env.reset()
-        if render:
+        if render_always:
             env.render()
         total_rewards = 0.0
         for i in range(episode_maxlen):
@@ -101,10 +103,12 @@ def main():
             action_values = net.action_values(np.stack([state]))[0]
             action = policy.select_action(action_values)
             state, reward, done, info = env.step(action)
-            if render:
+            if render_always:
                 env.render()
             total_rewards += reward
             if done:
+                if render_end:
+                    env.render()
                 break
         all_total_rewards.append(total_rewards)
         print('episode reward:', total_rewards)
