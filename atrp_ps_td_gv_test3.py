@@ -76,13 +76,13 @@ register(
     kwargs=kwargs_v3
 )
 
-kwargs_v3 = kwargs_common.copy()
-kwargs_v3['dn_distribution'] = gv48
-kwargs_v3['thres_loose'] = 5e-3
-kwargs_v3['thres_tight'] = 1e-3
+kwargs_v4 = kwargs_common.copy()
+kwargs_v4['dn_distribution'] = gv48
+kwargs_v4['thres_loose'] = 5e-3
+kwargs_v4['thres_tight'] = 1e-3
 register(
     id='ATRP-ps-td-gv48-test3-v4',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
-    kwargs=kwargs_v3
+    kwargs=kwargs_v4
 )
