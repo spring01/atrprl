@@ -66,6 +66,9 @@ def arguments():
         help='Maximum length of partial rollout to calculate value target')
 
     # neural net arguments
+    parser.add_argument('--net_type', default='dense', type=str,
+        choices=['dense', 'conv'],
+        help='Neural net type')
     parser.add_argument('--net_arch', nargs='+', type=int, default=[100],
         help='Neural net architecture')
 
@@ -120,6 +123,7 @@ from hcdrl.common.interface import list_arrays_ravel
 from hcdrl.common.util import get_output_folder
 from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.simple_nets import simple_acnet
+from conv1d_nets import conv_acnet, list_arrays_ravel_expand
 
 def worker(args):
     importlib.import_module(args.env_import)
@@ -144,16 +148,22 @@ def worker(args):
     rep_dev = tf.train.replica_device_setter(worker_device=worker_dev,
                                              cluster=cluster)
     net_args = input_shape, num_actions, args.net_arch
+    if args.net_type == 'dense':
+        acnet = simple_acnet
+        interface = list_arrays_ravel
+    elif args.net_type == 'conv':
+        acnet = conv_acnet
+        interface = list_arrays_ravel_expand
 
     # global net
     with tf.device(rep_dev):
-        acnet_global = ACNet(simple_acnet(*net_args))
+        acnet_global = ACNet(acnet(*net_args))
         global_weights = acnet_global.weights
         step_counter_global = StepCounter()
 
     # local net
     with tf.device(worker_dev):
-        acnet_local = ACNet(simple_acnet(*net_args))
+        acnet_local = ACNet(acnet(*net_args))
         acnet_local.set_loss()
         adam = tf.train.AdamOptimizer(args.rl_learning_rate)
         acnet_local.set_optimizer(adam, train_weights=global_weights)
@@ -172,7 +182,7 @@ def worker(args):
             obj.set_session(sess)
         agent = A3C(is_master=is_master,
                     acnet_global=acnet_global, acnet_local=acnet_local,
-                    state_to_input=list_arrays_ravel,
+                    state_to_input=interface,
                     policy=policy, rollout=rollout,
                     discount=args.rl_discount,
                     train_steps=args.rl_train_steps,
