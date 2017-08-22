@@ -80,6 +80,10 @@ def main():
     elif net_type == 'acnet':
         net_builder = lambda args: ACNet(simple_acnet(*args))
     net_args = input_shape, num_actions, args.net_arch
+
+    model = simple_acnet(*net_args)
+    import pdb; pdb.set_trace()
+
     net = net_builder(net_args)
     sess = tf.Session()
     net.set_session(sess)
