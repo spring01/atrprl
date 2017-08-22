@@ -16,6 +16,7 @@ from hcdrl.common.interface import list_arrays_ravel
 from hcdrl.common.neuralnet.qnet import QNet
 from hcdrl.common.neuralnet.acnet import ACNet
 from hcdrl.simple_nets import simple_acnet, simple_qnet
+from conv1d_nets import conv_acnet, conv_qnet, list_arrays_ravel_expand
 
 
 episode_maxlen = 100000
@@ -41,8 +42,11 @@ def main():
         help='Epsilon in epsilon-greedy policy')
 
     # neural net arguments
-    parser.add_argument('--net_type', default='acnet', type=str,
+    parser.add_argument('--net_rl_type', default='acnet', type=str,
         choices=['qnet', 'acnet'],
+        help='Neural net reinforcement learning algorithm type')
+    parser.add_argument('--net_type', default='dense', type=str,
+        choices=['dense', 'conv'],
         help='Neural net type')
     parser.add_argument('--net_arch', nargs='+', type=int, default=(100,),
         help='Neural net architecture')
@@ -75,10 +79,19 @@ def main():
 
     # neural net
     net_type = args.net_type.lower()
-    if net_type == 'qnet':
-        net_builder = lambda args: QNet(simple_qnet(*args))
-    elif net_type == 'acnet':
-        net_builder = lambda args: ACNet(simple_acnet(*args))
+    if args.net_type == 'dense':
+        acnet = simple_acnet
+        qnet = simple_qnet
+        interface = list_arrays_ravel
+    elif args.net_type == 'conv':
+        acnet = conv_acnet
+        qnet = conv_qnet
+        interface = list_arrays_ravel_expand
+    net_rl_type = args.net_rl_type.lower()
+    if net_rl_type == 'qnet':
+        net_builder = lambda args: QNet(qnet(*args))
+    elif net_rl_type == 'acnet':
+        net_builder = lambda args: ACNet(acnet(*args))
     net_args = input_shape, num_actions, args.net_arch
     net = net_builder(net_args)
     sess = tf.Session()
