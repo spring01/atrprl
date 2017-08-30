@@ -58,6 +58,9 @@ class ATRPBase(gym.Env):
                           and quantities of all species;
             'all stable': capped indicators, volume, and quantities
                           of stable species.
+        obs_noise:
+            `None` if no noise; otherwise it's a float number representing
+            the variance of gaussian noise.
 
     Action related:
         mono_init:    initial quantity of monomer;
@@ -73,7 +76,7 @@ class ATRPBase(gym.Env):
     def __init__(self, max_rad_len=100, termination=True,
                  step_time=1e1, completion_time=1e5, min_steps=100,
                  k_prop=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
-                 obs_mode='all',
+                 obs_mode='all', obs_noise=None,
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
                  cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
@@ -100,6 +103,7 @@ class ATRPBase(gym.Env):
 
         # initial quant
         self.obs_mode = obs_mode.lower()
+        self.obs_noise = obs_noise
         self.init_amount = {MONO: mono_init, CU1: cu1_init, CU2: cu2_init,
                             DORM1: dorm1_init, SOL: sol_init}
         self.volume_init = mono_init / mono_density + sol_init / sol_density
@@ -280,17 +284,24 @@ class ATRPBase(gym.Env):
             self.added[key] += amount
 
     def observation(self):
+        # capped indicators and volume aren't noisy
         capped = [self.capped(key) for key in (MONO, CU1, CU2, DORM1, SOL)]
+        obs_cap_vol = np.concatenate([capped, [self.volume]])
         if self.obs_mode == 'all':
-            obs = [capped, [self.volume], self.quant]
+            obs_chains = [self.quant]
         elif self.obs_mode == 'all stable':
             stable_chains = self.stable_chains()
             quant = self.quant
             index = self.index
             cu1 = quant[index[CU1]]
             cu2 = quant[index[CU2]]
-            obs = [capped, [self.volume], stable_chains, [cu1], [cu2]]
-        return np.concatenate(obs)
+            obs_chains = [stable_chains, [cu1], [cu2]]
+        obs_chains = np.concatenate(obs_chains)
+        # obs_chains could be noisy
+        if self.obs_noise is not None:
+            noise = np.random.normal(scale=self.obs_noise, size=len(obs_chains))
+            obs_chains += noise
+        return np.concatenate([obs_cap_vol, obs_chains])
 
     def stable_chains(self):
         quant = self.quant
