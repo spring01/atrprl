@@ -16,7 +16,7 @@ kwargs_common = {
     'k_act': 0.45,
     'k_deact': 1.1e7,
     'k_ter': 1e8,
-    'observation_mode': 'all stable',
+    'obs_mode': 'all stable',
     'mono_init': 0.0,
     'cu1_init': 0.0,
     'cu2_init': 0.0,
