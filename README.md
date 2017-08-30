@@ -3,9 +3,17 @@
 ## ATRP environment: OpenAI-gym environment of an ATRP controller.
 Minimal usage:
 ```
-from atrp_env import ATRPEnv
-env = ATRPEnv()
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+
+import gym, atrp_ps
+
+env = gym.make('ATRP-ps-v0')
 state = env.reset()
-state_next, reward, done, info = env.step(0)
+while True:
+    state, reward, done, info = env.step(env.action_space.sample())
+    env.render()
+    if done:
+        break
 ```
 
