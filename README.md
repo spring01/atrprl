@@ -1,4 +1,4 @@
-# ATRP-RL: Controlling controlled polymerization via ATRP
+# ATRP-RL: Controlling controlled polymerization (ATRP) with deep reinforcement learning
 
 ## ATRP environment: OpenAI-gym environment of an ATRP controller.
 Minimal usage:
