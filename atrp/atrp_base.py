@@ -33,6 +33,11 @@ EPS = 1e-3
 ''' scale ymax in rendering by this factor '''
 MARGIN_SCALE = 1.1
 
+''' ode integrator, integration method, and number of steps '''
+ODE_INT    = 'vode'
+ODE_METHOD = 'bdf'
+ODE_NSTEPS = 5000
+
 class ATRPBase(gym.Env):
 
     '''
@@ -126,7 +131,8 @@ class ATRPBase(gym.Env):
 
         # ode integrator
         odeint = ode(self.atrp, self.atrp_jac)
-        self.odeint = odeint.set_integrator('vode', method='bdf', nsteps=5000)
+        odeint.set_integrator(ODE_INT, method=ODE_METHOD, nsteps=ODE_NSTEPS)
+        self.odeint = odeint
 
     def _reset(self):
         self.step_count = 0
