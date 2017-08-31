@@ -11,7 +11,7 @@ register(
         'step_time': 1e2,
         'completion_time': 1e5,
         'min_steps': 100,
-        'termination': False,
+        'termination': True,
         'k_prop': 1.6e3,
         'k_act': 0.45,
         'k_deact': 1.1e7,
