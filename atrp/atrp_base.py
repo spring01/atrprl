@@ -185,6 +185,7 @@ class ATRPBase(gym.Env):
                 self.action_rect[pos] = rect
             plt.xlabel('Chain length')
             plt.tight_layout()
+            plt.gcf().show()
         else:
             self.update_plot(DORM)
             self.update_plot(RAD)
@@ -201,8 +202,7 @@ class ATRPBase(gym.Env):
                     else:
                         color = 'g' if act else 'r'
                     rect.set_color(color)
-        plt.draw()
-        plt.pause(0.0001)
+        plt.gcf().canvas.draw()
 
     def init_index(self):
         max_rad_len = self.max_rad_len
