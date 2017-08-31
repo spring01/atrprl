@@ -110,8 +110,6 @@ class ATRPBase(gym.Env):
         self.quant_init = self.init_quant()
 
         # actions
-        self.action_pos = 0.0, 0.2, 0.4, 0.6, 0.8
-        self.action_num = MONO, CU1, CU2, DORM1, SOL
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
         self.add_cap = {MONO: mono_cap, CU1: cu1_cap, CU2: cu2_cap,
@@ -152,6 +150,8 @@ class ATRPBase(gym.Env):
         return observation, reward, done, info
 
     def _render(self, mode='human', close=False):
+        action_pos = 0.0, 0.2, 0.4, 0.6, 0.8
+        action_num = MONO, CU1, CU2, DORM1, SOL
         if close:
             if self.axes is not None:
                 self.axes = None
@@ -175,7 +175,7 @@ class ATRPBase(gym.Env):
             action_axis.get_yaxis().set_visible(False)
             self.action_rect = {}
             action_labels = 'Monomer', 'Cu(I)', 'Cu(II)', 'Initiator', 'Solvent'
-            zip_iter = zip(self.action_pos, action_labels, self.action_num)
+            zip_iter = zip(action_pos, action_labels, action_num)
             for pos, label, anum in zip_iter:
                 color = 'y' if self.capped(anum) else 'r'
                 rect = patches.Rectangle((pos, 0.0), 0.18, 1.0,
@@ -193,7 +193,7 @@ class ATRPBase(gym.Env):
                 self.update_plot(STABLE)
             last_action = self.last_action
             if last_action is not None:
-                zip_iter = zip(self.action_pos, last_action, self.action_num)
+                zip_iter = zip(action_pos, last_action, action_num)
                 for pos, act, anum in zip_iter:
                     rect = self.action_rect[pos]
                     if self.capped(anum):
