@@ -64,6 +64,11 @@ def main():
         choices=['true', 't', 'false', 'f', 'end'],
         help='Do rendering or not')
 
+    # print action sequence
+    parser.add_argument('--print_action_seq', default='false', type=str,
+        choices=['true', 't', 'false', 'f', 'end'],
+        help='Whether the evaluator prints out the action sequence')
+
     # parse arguments
     args = parser.parse_args()
     render = args.render.lower()
@@ -111,10 +116,12 @@ def main():
         if render_always:
             env.render()
         total_rewards = 0.0
+        action_sequence = []
         for i in range(episode_maxlen):
             state = list_arrays_ravel(state)
             action_values = net.action_values(np.stack([state]))[0]
             action = policy.select_action(action_values)
+            action_sequence.append(action)
             state, reward, done, info = env.step(action)
             if render_always:
                 env.render()
@@ -125,6 +132,9 @@ def main():
                 break
         all_total_rewards.append(total_rewards)
         print('episode reward:', total_rewards)
+        if args.print_action_seq in ['true', 't']:
+            print('Action sequence:')
+            print(action_sequence)
     print('average episode reward:', np.mean(all_total_rewards))
 
 
