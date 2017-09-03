@@ -120,3 +120,14 @@ register(
     kwargs=kwargs_gv48
 )
 
+gv52 = np.exp(- space_shifted * space_shifted / (2 * 48))
+gv52 /= np.sum(gv52)
+kwargs_gv52 = kwargs_common.copy()
+kwargs_gv52['dn_distribution'] = gv52
+register(
+    id='ATRP-ps-td-gv52-v0',
+    entry_point=entry_point,
+    max_episode_steps=max_episode_steps,
+    kwargs=kwargs_gv52
+)
+
