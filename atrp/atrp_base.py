@@ -55,7 +55,9 @@ class ATRPBase(gym.Env):
         k_prop:  rate constant for (monomer consumption);
         k_act:   rate constant for (dormant chain --> radical);
         k_deact: rate constant for (radical --> dormant chain);
-        k_ter:   rate constant for (radical --> terminated chain).
+        k_ter:   rate constant for (radical --> terminated chain);
+        k_noise: `None` if no noise; otherwise it's a float number representing
+            the fluctuation ratio of rate constants (0.1 means +-10%, etc.).
 
     Observation related:
         obs_mode:
@@ -80,7 +82,7 @@ class ATRPBase(gym.Env):
 
     def __init__(self, max_rad_len=100, termination=True,
                  step_time=1e1, completion_time=1e5, min_steps=100,
-                 k_prop=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10,
+                 k_prop=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10, k_noise=None,
                  obs_mode='all', obs_noise=None,
                  mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
@@ -102,6 +104,7 @@ class ATRPBase(gym.Env):
         rate_constant = {K_POLY: k_prop, K_ACT: k_act, K_DEACT: k_deact}
         rate_constant[K_TER] = k_ter if termination else 0.0
         self.rate_constant = rate_constant
+        self.k_noise = k_noise
 
         # index (used in self.atrp and self.atrp_jac)
         self.index = self.init_index()
@@ -303,7 +306,7 @@ class ATRPBase(gym.Env):
             cu2 = quant[index[CU2]]
             obs_chains = [stable_chains, [cu1], [cu2]]
         obs_chains = np.concatenate(obs_chains)
-        # obs_chains could be noisy
+        # obs_chains could be noisy (gaussian noise)
         if self.obs_noise is not None:
             noise = np.random.normal(scale=self.obs_noise, size=len(obs_chains))
             obs_chains += noise
@@ -331,10 +334,26 @@ class ATRPBase(gym.Env):
         conc = self.quant / volume
         odeint = self.odeint
         odeint.set_initial_value(conc, 0.0)
-        conc = odeint.integrate(step_time)
-        quant = conc * volume
 
-        # adjust 'quant' so that the monomer amount is conserved
+        # add noise to rate constants if requested
+        if self.k_noise is not None:
+            original_rate_constant = self.rate_constant.copy()
+            k_noise = self.k_noise
+            rate_constant = {}
+            for key, value in original_rate_constant.items():
+                rand_factor = np.random.rand() * 2 * k_noise + (1.0 - k_noise)
+                rate_constant[key] = value * rand_factor
+            self.rate_constant = rate_constant
+
+        # perform integration
+        conc = odeint.integrate(step_time)
+
+        # change rate constants back to original values
+        if self.k_noise is not None:
+            self.rate_constant = original_rate_constant
+
+        # calculate and adjust 'quant' so that the monomer amount is conserved
+        quant = conc * volume
         index = self.index
         added = self.added
         ref_quant_eq_mono = added[MONO] + added[DORM1]
