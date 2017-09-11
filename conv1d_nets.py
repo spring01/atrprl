@@ -1,9 +1,9 @@
 
 import numpy as np
-import keras.layers as kl
-from keras.initializers import RandomNormal
-from keras import backend as K
-from keras.models import Model
+import tensorflow.contrib.keras.api.keras.layers as kl
+from tensorflow.contrib.keras.api.keras.initializers import RandomNormal
+from tensorflow.contrib.keras.api.keras import backend as K
+from tensorflow.contrib.keras.api.keras.models import Model
 
 
 '''
