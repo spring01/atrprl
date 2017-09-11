@@ -36,7 +36,7 @@ def _conv_state_feature(input_shape):
     dim_input, = input_shape
     input_shape = dim_input, 1
     state = kl.Input(shape=input_shape)
-    Conv1D = kl.convolutional.Conv1D
+    Conv1D = kl.Conv1D
     conv1 = Conv1D(8, 32, strides=2, activation='relu')(state)
     conv2 = Conv1D(8, 32, strides=1, activation='relu')(conv1)
     feature = kl.Flatten()(conv2)
