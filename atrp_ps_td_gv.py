@@ -120,7 +120,7 @@ register(
     kwargs=kwargs_gv48
 )
 
-gv52 = np.exp(- space_shifted * space_shifted / (2 * 48))
+gv52 = np.exp(- space_shifted * space_shifted / (2 * 52))
 gv52 /= np.sum(gv52)
 kwargs_gv52 = kwargs_common.copy()
 kwargs_gv52['dn_distribution'] = gv52
