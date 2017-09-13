@@ -82,12 +82,12 @@ class ATRPBase(gym.Env):
 
     def __init__(self, max_rad_len=100, termination=True,
                  step_time=1e1, completion_time=1e5, min_steps=100,
-                 k_prop=1e4, k_act=2e-2, k_deact=1e5, k_ter=1e10, k_noise=None,
+                 k_prop=1e4, k_act=1e-2, k_deact=1e5, k_ter=1e10, k_noise=None,
                  obs_mode='all', obs_noise=None,
-                 mono_init=9.0, mono_density=9.0, mono_unit=0.01, mono_cap=None,
-                 cu1_init=0.2, cu1_unit=0.01, cu1_cap=None,
-                 cu2_init=0.2, cu2_unit=0.01, cu2_cap=None,
-                 dorm1_init=0.4, dorm1_unit=0.01, dorm1_cap=None,
+                 mono_init=1.0, mono_density=1.0, mono_unit=0.01, mono_cap=None,
+                 cu1_init=0.1, cu1_unit=0.01, cu1_cap=None,
+                 cu2_init=0.1, cu2_unit=0.01, cu2_cap=None,
+                 dorm1_init=0.1, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=0.0,
                  **kwargs):
         # setup the simulation system
