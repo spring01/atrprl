@@ -41,15 +41,17 @@ ODE_NSTEPS = 5000
 class ATRPBase(gym.Env):
 
     '''
-    Length of `quant` is `4 * (max radical chain length) + 2`.
+    Length of `quant`:
+        (3 + 2 * max_rad_len) if termination is off;
+        (4 * max_rad_len + 2) if termination is on.
 
     Partition of `quant`:
-        mono  = [M]                 = quant[0],
-        cu_i  = [CuBr]              = quant[1],
-        cu_ii = [CuBr2]             = quant[2],
-        dorm  = [P1Br], ..., [PnBr] = quant[3:3+n],
-        rad   = [P1.], ..., [Pn.]   = quant[3+n:3+2*n],
-        ter   = [T2], ..., [T2n]    = quant[3+2*n:2+4*n] (optional).
+        quant[0]           = mono  = [M]
+        quant[1]           = cu_i  = [CuBr]
+        quant[2]           = cu_ii = [CuBr2]
+        quant[3:3+n]       = dorm  = [P1Br], ..., [PnBr]
+        quant[3+n:3+2*n]   = rad   = [P1.], ..., [Pn.]
+        quant[3+2*n:2+4*n] = ter   = [T2], ..., [T2n] (optional).
 
     Rate constants:
         k_prop:  rate constant for (monomer consumption);
