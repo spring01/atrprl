@@ -131,3 +131,13 @@ register(
     kwargs=kwargs_gv52
 )
 
+kwargs_gv52_v1 = kwargs_common.copy()
+kwargs_gv52_v1['dn_distribution'] = gv52
+kwargs_gv52_v1['reward_loose'] = 0.0
+register(
+    id='ATRP-ps-td-gv52-v1',
+    entry_point=entry_point,
+    max_episode_steps=max_episode_steps,
+    kwargs=kwargs_gv52_v1
+)
+
