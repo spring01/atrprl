@@ -187,6 +187,7 @@ class ATRPBase(gym.Env):
             action_axis.get_xaxis().set_visible(False)
             action_axis.get_yaxis().set_visible(False)
             self.action_rect = {}
+            self.species_amount = {}
             action_labels = 'Monomer', 'Cu(I)', 'Cu(II)', 'Initiator', 'Solvent'
             zip_iter = zip(action_pos, action_labels, action_num)
             for pos, label, anum in zip_iter:
@@ -194,8 +195,10 @@ class ATRPBase(gym.Env):
                 rect = patches.Rectangle((pos, 0.0), 0.18, 1.0,
                                          color=color, fill=True)
                 action_axis.add_patch(rect)
-                action_axis.annotate(label, (pos + 0.03, 0.4))
+                action_axis.annotate(label, (pos + 0.03, 0.5))
+                amount = action_axis.annotate('', (pos + 0.03, 0.2))
                 self.action_rect[pos] = rect
+                self.species_amount[pos] = amount
             plt.xlabel('Chain length')
             plt.tight_layout()
             plt.gcf().show()
@@ -207,9 +210,15 @@ class ATRPBase(gym.Env):
                 self.update_plot(STABLE)
             last_action = self.last_action
             if last_action is not None:
+                added = self.added
+                add_cap = self.add_cap
                 zip_iter = zip(action_pos, last_action, action_num)
                 for pos, act, anum in zip_iter:
+                    this_added = added[anum]
+                    this_cap = add_cap[anum]
+                    amount_label = '{:.2f}/{:.2f}'.format(this_added, this_cap)
                     rect = self.action_rect[pos]
+                    self.species_amount[pos].set_text(amount_label)
                     if self.capped(anum):
                         color = 'y'
                     else:
