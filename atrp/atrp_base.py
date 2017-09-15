@@ -85,7 +85,7 @@ class ATRPBase(gym.Env):
     def __init__(self, max_rad_len=100, termination=True,
                  step_time=1e1, completion_time=1e5, min_steps=100,
                  k_prop=1e4, k_act=1e-2, k_deact=1e5, k_ter=1e10, k_noise=None,
-                 obs_mode='all', obs_noise=None,
+                 obs_mode='all', obs_noise=None, action_parse=True,
                  mono_init=1.0, mono_density=1.0, mono_unit=0.01, mono_cap=None,
                  cu1_init=0.1, cu1_unit=0.01, cu1_cap=None,
                  cu2_init=0.1, cu2_unit=0.01, cu2_cap=None,
@@ -120,6 +120,7 @@ class ATRPBase(gym.Env):
         self.quant_init = self.init_quant()
 
         # actions
+        self.action_parse = action_parse
         self.add_unit = {MONO: mono_unit, CU1: cu1_unit, CU2: cu2_unit,
                          DORM1: dorm1_unit, SOL: sol_unit}
         self.add_cap = {MONO: mono_cap, CU1: cu1_cap, CU2: cu2_cap,
@@ -149,7 +150,8 @@ class ATRPBase(gym.Env):
 
     def _step(self, action):
         self.step_count += 1
-        action = self._parse_action(action)
+        if self.action_parse:
+            action = self._parse_action(action)
         self.last_action = action
         self.take_action(action)
         done = self.done()
