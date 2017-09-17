@@ -1,8 +1,6 @@
 
 import gym, gym.spaces
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from scipy.integrate import ode
 
 
@@ -91,6 +89,7 @@ class ATRPBase(gym.Env):
                  cu2_init=0.1, cu2_unit=0.01, cu2_cap=None,
                  dorm1_init=0.1, dorm1_unit=0.01, dorm1_cap=None,
                  sol_init=0.0, sol_density=1.0, sol_unit=0.01, sol_cap=0.0,
+                 render_window_size=(640, 480),
                  **kwargs):
         # setup the simulation system
         # fundamental properties of the polymerization process
@@ -133,6 +132,7 @@ class ATRPBase(gym.Env):
         self._init_reward(**kwargs)
 
         # rendering
+        self.render_window_size = render_window_size
         self.axes = None
 
         # ode integrator
@@ -163,6 +163,13 @@ class ATRPBase(gym.Env):
         return observation, reward, done, info
 
     def _render(self, mode='human', close=False):
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as patches
+        import matplotlib.backends.backend_agg as agg
+        import pygame
+
         action_pos = 0.0, 0.2, 0.4, 0.6, 0.8
         action_num = MONO, CU1, CU2, DORM1, SOL
         if close:
@@ -172,7 +179,7 @@ class ATRPBase(gym.Env):
                 plt.close()
             return
         if self.axes is None:
-            plt.figure()
+            self.render_fig = plt.figure()
             self.axes = {}
             self.plots = {}
             num_plots = 5 if self.termination else 3
@@ -201,7 +208,9 @@ class ATRPBase(gym.Env):
                 self.species_amount[pos] = amount
             plt.xlabel('Chain length')
             plt.tight_layout()
-            plt.gcf().show()
+            pygame.init()
+            pygame.display.set_mode(self.render_window_size, pygame.DOUBLEBUF)
+            self.render_screen = pygame.display.get_surface()
         else:
             self.update_plot(DORM)
             self.update_plot(RAD)
@@ -224,7 +233,13 @@ class ATRPBase(gym.Env):
                     else:
                         color = 'g' if act else 'r'
                     rect.set_color(color)
-        plt.gcf().canvas.draw()
+        canvas = agg.FigureCanvasAgg(self.render_fig)
+        canvas.draw()
+        raw_data = canvas.get_renderer().tostring_rgb()
+        size = canvas.get_width_height()
+        surf = pygame.image.fromstring(raw_data, size, 'RGB')
+        self.render_screen.blit(surf, (0, 0))
+        pygame.display.flip()
 
     def init_index(self):
         max_rad_len = self.max_rad_len
@@ -554,6 +569,7 @@ class ATRPBase(gym.Env):
         return jac
 
     def init_plot(self, key, num, num_plots):
+        import matplotlib.pyplot as plt
         values = self.chain(key)
         len_values = len(values)
         chain_label_dict = {DORM: 'Dormant chains',

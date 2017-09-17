@@ -1,6 +1,7 @@
 numpy
 scipy
-matplotlib
 gym
 pillow
 tensorflow>=1.3
+matplotlib
+pygame
