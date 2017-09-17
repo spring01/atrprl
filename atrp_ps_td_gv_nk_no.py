@@ -50,7 +50,7 @@ gv24 /= np.sum(gv24)
 kwargs_gv24 = kwargs_common.copy()
 kwargs_gv24['dn_distribution'] = gv24
 register(
-    id='ATRP-ps-td-gv24-no-v0',
+    id='ATRP-ps-td-gv24-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv24
@@ -61,7 +61,7 @@ gv28 /= np.sum(gv28)
 kwargs_gv28 = kwargs_common.copy()
 kwargs_gv28['dn_distribution'] = gv28
 register(
-    id='ATRP-ps-td-gv28-no-v0',
+    id='ATRP-ps-td-gv28-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv28
@@ -72,7 +72,7 @@ gv32 /= np.sum(gv32)
 kwargs_gv32 = kwargs_common.copy()
 kwargs_gv32['dn_distribution'] = gv32
 register(
-    id='ATRP-ps-td-gv32-no-v0',
+    id='ATRP-ps-td-gv32-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv32
@@ -83,7 +83,7 @@ gv36 /= np.sum(gv36)
 kwargs_gv36 = kwargs_common.copy()
 kwargs_gv36['dn_distribution'] = gv36
 register(
-    id='ATRP-ps-td-gv36-no-v0',
+    id='ATRP-ps-td-gv36-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv36
@@ -94,7 +94,7 @@ gv40 /= np.sum(gv40)
 kwargs_gv40 = kwargs_common.copy()
 kwargs_gv40['dn_distribution'] = gv40
 register(
-    id='ATRP-ps-td-gv40-no-v0',
+    id='ATRP-ps-td-gv40-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv40
@@ -105,7 +105,7 @@ gv44 /= np.sum(gv44)
 kwargs_gv44 = kwargs_common.copy()
 kwargs_gv44['dn_distribution'] = gv44
 register(
-    id='ATRP-ps-td-gv44-no-v0',
+    id='ATRP-ps-td-gv44-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv44
@@ -116,7 +116,7 @@ gv48 /= np.sum(gv48)
 kwargs_gv48 = kwargs_common.copy()
 kwargs_gv48['dn_distribution'] = gv48
 register(
-    id='ATRP-ps-td-gv48-no-v0',
+    id='ATRP-ps-td-gv48-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv48
@@ -127,7 +127,7 @@ gv52 /= np.sum(gv52)
 kwargs_gv52 = kwargs_common.copy()
 kwargs_gv52['dn_distribution'] = gv52
 register(
-    id='ATRP-ps-td-gv52-no-v0',
+    id='ATRP-ps-td-gv52-nk-no-v0',
     entry_point=entry_point,
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_gv52
