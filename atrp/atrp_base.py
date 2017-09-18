@@ -208,7 +208,7 @@ class ATRPBase(gym.Env):
                 self.species_amount[pos] = amount
             plt.xlabel('Chain length')
             plt.tight_layout()
-            pygame.init()
+            pygame.display.init()
             pygame.display.set_mode(self.render_window_size, pygame.DOUBLEBUF)
             self.render_screen = pygame.display.get_surface()
         else:
