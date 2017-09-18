@@ -118,7 +118,7 @@ def main():
         total_rewards = 0.0
         action_sequence = []
         for i in range(episode_maxlen):
-            state = list_arrays_ravel(state)
+            state = interface(state)
             action_values = net.action_values(np.stack([state]))[0]
             action = policy.select_action(action_values)
             action_sequence.append(action)
