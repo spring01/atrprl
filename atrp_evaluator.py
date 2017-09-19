@@ -138,5 +138,5 @@ def main():
     print('average episode reward:', np.mean(all_total_rewards))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
