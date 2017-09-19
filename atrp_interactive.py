@@ -22,7 +22,7 @@ def main():
     # environment
     parser.add_argument('--env', default='ATRP-ps-v0',
         help='Environment name')
-    parser.add_argument('--env_import', default='atrp_ps',
+    parser.add_argument('--env_import', default='atrpenv.atrp_ps',
         help='File name where the environment is defined')
     parser.add_argument('--env_num_frames', default=1, type=int,
         help='Number of frames in a state')
