@@ -46,6 +46,7 @@ def main():
     all_states = [env.reset()]
     env.render()
     all_actions = []
+    all_rewards = []
 
     # detect key presses to step the environment
     noop_key = K_BACKQUOTE
@@ -77,6 +78,7 @@ def main():
             pressed = ini_pressed.copy()
             all_actions.append(action)
             state, reward, done, info = env.step(action)
+            all_rewards.append(reward)
             all_states.append(state)
             env.render()
             if done:
@@ -85,7 +87,7 @@ def main():
     # save states and actions if requested
     if args.save is not None:
         with open(args.save, 'wb') as save:
-            pickle.dump((all_states, all_actions), save)
+            pickle.dump((all_states, all_actions, all_rewards), save)
         print('states and actions saved to {}'.format(args.save))
 
     # wait for user to close the pygame window
