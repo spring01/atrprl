@@ -85,6 +85,16 @@ register(
     kwargs=kwargs_m10
 )
 
+kwargs_m10_v1 = kwargs_common.copy()
+m10_v1 = skew_distribution(alpha=-1.0, loc=24.0, scale=36.0)
+kwargs_m10_v1['dn_distribution'] = m10_v1
+register(
+    id='ATRP-ps-td-skew-m10-v1',
+    entry_point=entry_point,
+    max_episode_steps=max_episode_steps,
+    kwargs=kwargs_m10_v1
+)
+
 kwargs_m05 = kwargs_common.copy()
 m05 = skew_distribution(alpha=-0.5, loc=24.0, scale=32.0)
 kwargs_m05['dn_distribution'] = m05
@@ -134,4 +144,25 @@ register(
     max_episode_steps=max_episode_steps,
     kwargs=kwargs_p20
 )
+
+kwargs_p25 = kwargs_common.copy()
+p25 = skew_distribution(alpha=2.5, loc=23.0, scale=32.0)
+kwargs_p25['dn_distribution'] = p25
+register(
+    id='ATRP-ps-td-skew-p25-v0',
+    entry_point=entry_point,
+    max_episode_steps=max_episode_steps,
+    kwargs=kwargs_p25
+)
+
+kwargs_p30 = kwargs_common.copy()
+p30 = skew_distribution(alpha=3.0, loc=23.0, scale=32.0)
+kwargs_p30['dn_distribution'] = p30
+register(
+    id='ATRP-ps-td-skew-p30-v0',
+    entry_point=entry_point,
+    max_episode_steps=max_episode_steps,
+    kwargs=kwargs_p30
+)
+
 
