@@ -164,7 +164,6 @@ class ATRPBase(gym.Env):
 
     def _render(self, mode='human', close=False):
         import matplotlib
-        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         import matplotlib.patches as patches
         import matplotlib.backends.backend_agg as agg
