@@ -2,7 +2,7 @@
 import os
 os.environ['OMP_NUM_THREADS'] = '1'
 
-import gym, atrp_ps
+import gym, atrpenv.atrp_ps
 
 env = gym.make('ATRP-ps-v0')
 state = env.reset()
