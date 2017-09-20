@@ -78,6 +78,18 @@ register(
     kwargs=kwargs_gv32
 )
 
+gv32_v1 = np.exp(- space_shifted * space_shifted / (2 * 32))
+gv32_v1 /= np.sum(gv32_v1)
+kwargs_gv32_v1 = kwargs_common.copy()
+kwargs_gv32_v1['k_noise'] = 0.1
+kwargs_gv32_v1['dn_distribution'] = gv32_v1
+register(
+    id='ATRP-ps-td-gv32-nk-no-v1',
+    entry_point=entry_point,
+    max_episode_steps=max_episode_steps,
+    kwargs=kwargs_gv32_v1
+)
+
 gv36 = np.exp(- space_shifted * space_shifted / (2 * 36))
 gv36 /= np.sum(gv36)
 kwargs_gv36 = kwargs_common.copy()
