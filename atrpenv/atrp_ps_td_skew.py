@@ -50,9 +50,9 @@ def skew_distribution(alpha, loc, scale):
     space_shifted = (space - mean) / np.sqrt(var)
     gaussian = np.exp(- space_shifted * space_shifted / 2)
     skew = 1.0 + erf(alpha * space_shifted / np.sqrt(2.0))
-    m20 = gaussian * skew
-    m20 /= np.sum(m20)
-    return m20
+    dist = gaussian * skew
+    dist /= np.sum(dist)
+    return dist
 
 
 kwargs_m20 = kwargs_common.copy()
@@ -165,4 +165,13 @@ register(
     kwargs=kwargs_p30
 )
 
+kwargs_p30_v1 = kwargs_common.copy()
+p30_v1 = skew_distribution(alpha=3.0, loc=23.0, scale=36.0)
+kwargs_p30_v1['dn_distribution'] = p30_v1
+register(
+    id='ATRP-ps-td-skew-p30-v1',
+    entry_point=entry_point,
+    max_episode_steps=max_episode_steps,
+    kwargs=kwargs_p30_v1
+)
 
